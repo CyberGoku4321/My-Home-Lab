@@ -4,7 +4,7 @@ Documenting my IT career transition and home lab projects
 # MARVIN'S IT & NETWORK ENGINEERING LAB
 
 ## Objective
-Transitioning from USMC Satellite/Data Communications (0627/0628) to Civilian Network Engineering. This repository tracks my hands-on experience with virtualization, security, and home-lab infrastructure
+Transitioning from USMC Satellite/SMART-T Operator (0627/0628) to Civilian Network Engineering. This repository tracks my hands-on experience with virtualization, security, and home-lab infrastructure
 
 ## Hybrid Workflow
 I maintain a synchronized lab environment across two primary machines to ensure continuous project development:

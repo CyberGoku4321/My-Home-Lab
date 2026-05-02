@@ -21,3 +21,8 @@ I maintain a synchronized lab environment across two primary machines to ensure 
 * **Git/GitHub Version Control:** Managing a cross-platform codebase between local and mobile environments
 * **Type-2 Virtualization:** (VMware/VirtualBox)
 * **Documentation:** Technical writing and repository management
+
+## Project Roadmap
+1. **[COMPLETED] Linux Fundamentals:** Establishing core competency in CLI, file management, and system administration using Linux Mint.
+2. **[PLANNED] Network Engineering Sandbox:** Deploying pfSense in a virtualized environment to learn firewall rules, VLANs, and VPN configuration.
+3. **[PLANNED] Proxmox Migration:** Migrating the virtual lab to a dedicated Dell Optiplex server.

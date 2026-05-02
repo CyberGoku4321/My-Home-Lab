@@ -26,3 +26,5 @@ I maintain a synchronized lab environment across two primary machines to ensure 
 1. **[COMPLETED] Linux Fundamentals:** Establishing core competency in CLI, file management, and system administration using Linux Mint.
 2. **[PLANNED] Network Engineering Sandbox:** Deploying pfSense in a virtualized environment to learn firewall rules, VLANs, and VPN configuration.
 3. **[PLANNED] Proxmox Migration:** Migrating the virtual lab to a dedicated Dell Optiplex server.
+
+*Status: Linux Mint installation confirmed and VM powered down for break.*

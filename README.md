@@ -38,3 +38,10 @@ I maintain a synchronized lab environment across two primary machines to ensure 
 - **Task:** Installed and configured Apache2 HTTP Server on Linux Mint 22.
 - **Verification:** Successfully verified service status via `systemctl` and confirmed local loopback connectivity on Port 80.
 - **Learning:** Explored the `/var/www/html` directory structure for web hosting.
+
+## Phase 4: Environment Synchronization & Service Validation
+- **Status:** COMPLETE
+- **Infrastructure:** Successfully provisioned a local Apache2 web server to act as a development dashboard.
+- **Environment:** Configured a "Mirror Environment" between Windows 11 (Host) and Linux Mint 22 (Guest). 
+- **Tooling:** Installed and configured Git on the guest OS; successfully cloned the repository to unify the workflow.
+- **Verification:** Service `apache2` is persistent and verified active. System is now ready for Network Automation and CCNA-level labbing.

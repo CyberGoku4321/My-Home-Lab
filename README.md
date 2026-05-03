@@ -32,3 +32,9 @@ I maintain a synchronized lab environment across two primary machines to ensure 
 - **Action:** Scaled VM Virtual Disk from 20GB to 60GB.
 - **Tools Used:** VMware Settings and GParted Partition Editor to extend the filesystem.
 - **Status:** Resolved. System has sufficient overhead for Timeshift snapshots.
+
+## Phase 3: Infrastructure & Services
+- **Status:** Web Server Deployed.
+- **Task:** Installed and configured Apache2 HTTP Server on Linux Mint 22.
+- **Verification:** Successfully verified service status via `systemctl` and confirmed local loopback connectivity on Port 80.
+- **Learning:** Explored the `/var/www/html` directory structure for web hosting.

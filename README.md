@@ -27,4 +27,8 @@ I maintain a synchronized lab environment across two primary machines to ensure 
 2. **[PLANNED] Network Engineering Sandbox:** Deploying pfSense in a virtualized environment to learn firewall rules, VLANs, and VPN configuration.
 3. **[PLANNED] Proxmox Migration:** Migrating the virtual lab to a dedicated Dell Optiplex server.
 
-*Status: Linux Mint installation confirmed and VM powered down for break.*
+### Troubleshooting Log - May 2026
+- **Issue:** Encountered "Low Disk Space" warning (Filesystem Root < 300MB) after system updates.
+- **Action:** Scaled VM Virtual Disk from 20GB to 60GB.
+- **Tools Used:** VMware Settings and GParted Partition Editor to extend the filesystem.
+- **Status:** Resolved. System has sufficient overhead for Timeshift snapshots.

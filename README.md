@@ -52,5 +52,12 @@ I maintain a synchronized lab environment across two primary machines to ensure 
     - [x] Git/GitHub Integration (Write-access confirmed from Guest OS)
     - [x] Web Infrastructure (Apache2 active and serving on Port 80)
 - **Hardware Status:** Disk expanded to 60GB; system resources optimized for CCNA simulation.
-[x] Network Telemetry: Successfully captured and analyzed Layer 2-4 traffic using Wireshark; verified TCP 3-way handshake on Port 80
-[x] ICMP Diagnostics: Analyzed ICMP Echo Request/Reply sequences to verify Layer 3 reachability and gateway performance.
+    - [x] Network Telemetry: Successfully captured and analyzed Layer 2-4 traffic using Wireshark; verified TCP 3-way handshake on Port 80
+    - [x] ICMP Diagnostics: Analyzed ICMP Echo Request/Reply sequences to verify Layer 3 reachability and gateway performance.
+
+ ### Environment Technical Specifications
+- **Hypervisor:** VMware Workstation Pro 17
+- **Guest OS:** Linux Mint 22 (Cinnamon)
+- **Virtual Resources:** 2 vCPUs, 4GB RAM, 60GB Virtual Disk (NVMe)
+- **Network Mode:** NAT (Network Address Translation) with DHCP
+- **Key Tools:** Wireshark, Git, Apache2, UFW (Uncomplicated Firewall)

@@ -52,3 +52,4 @@ I maintain a synchronized lab environment across two primary machines to ensure 
     - [x] Git/GitHub Integration (Write-access confirmed from Guest OS)
     - [x] Web Infrastructure (Apache2 active and serving on Port 80)
 - **Hardware Status:** Disk expanded to 60GB; system resources optimized for CCNA simulation.
+[x] Network Telemetry: Successfully captured and analyzed Layer 2-4 traffic using Wireshark; verified TCP 3-way handshake on Port 80

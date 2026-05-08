@@ -45,6 +45,11 @@ I maintain a synchronized lab environment across two primary machines to ensure 
 - **Environment:** Configured a "Mirror Environment" between Windows 11 (Host) and Linux Mint 22 (Guest). 
 - **Tooling:** Installed and configured Git on the guest OS; successfully cloned the repository to unify the workflow.
 - **Verification:** Service `apache2` is persistent and verified active. System is now ready for Network Automation and CCNA-level labbing.
+- [x] **Host-Based Firewall:** Active and configured via UFW.
+- [x] **Traffic Filtering:** 
+    - **Permitted:** Port 80 (HTTP) for web server access.
+    - **Denied:** ICMP (Ping) protocol to prevent network discovery/reconnaissance.
+- [x] **Verification:** Confirmed external access to Apache via Host OS browser while simultaneously verifying ICMP packet drops.
 
 ## Lab Verification & Environment Audit
 - **Deployment Platform:** Linux Mint 22 (VMware Workstation Pro)

@@ -25,7 +25,7 @@ I maintain a synchronized lab environment across two primary machines to ensure 
 ## Project Roadmap
 1. **[COMPLETED] Linux Fundamentals:** Establishing core competency in CLI, file management, and system administration using Linux Mint.
 2. **[PLANNED] Network Engineering Sandbox:** Deploying pfSense in a virtualized environment to learn firewall rules, VLANs, and VPN configuration.
-3. **[PLANNED] Proxmox Migration:** Migrating the virtual lab to a dedicated Dell Optiplex server.
+3. **[COMPLETED] Proxmox Migration:** Migrating the virtual lab to a dedicated Dell Optiplex server.
 
 ### Troubleshooting Log - May 2026
 - **Issue:** Encountered "Low Disk Space" warning (Filesystem Root < 300MB) after system updates.
@@ -33,36 +33,63 @@ I maintain a synchronized lab environment across two primary machines to ensure 
 - **Tools Used:** VMware Settings and GParted Partition Editor to extend the filesystem.
 - **Status:** Resolved. System has sufficient overhead for Timeshift snapshots.
 
-## Phase 3: Infrastructure & Services
-- **Status:** Web Server Deployed.
-- **Task:** Installed and configured Apache2 HTTP Server on Linux Mint 22.
-- **Verification:** Successfully verified service status via `systemctl` and confirmed local loopback connectivity on Port 80.
-- **Learning:** Explored the `/var/www/html` directory structure for web hosting.
+---
+
+## Phase 1: Linux & Hypervisor Fundamentals
+**Status:** COMPLETED  
+**Objective:** Establish core competency in Linux administration and Type-2 virtualization.
+
+*   **Platform:** VMware Workstation Pro 17
+*   **Operating System:** Linux Mint 22 (Cinnamon)
+*   **Core Tasks:**
+    *   **System Hardening:** Configured UFW (Uncomplicated Firewall) to permit HTTP (Port 80) while denying ICMP (Ping) to simulate a stealthy production environment.
+    *   **Infrastructure:** Deployed and verified an **Apache2 Web Server** to serve local development pages.
+    *   **Storage Management:** Successfully performed a live partition expansion using **GParted** to scale the root filesystem from 20GB to 60GB without data loss.
+    *   **Telemetry:** Utilized **Wireshark** to analyze Layer 2-4 traffic, focusing on the TCP 3-way handshake and ICMP Echo Request sequences.
+
+## Phase 2: Virtual Network Architecture (pfSense)
+**Status:** ARCHIVED / MIGRATING TO PROXMOX  
+**Objective:** Design a virtualized security gateway to isolate lab traffic from the host network.
+
+*   **Tooling:** pfSense Community Edition (AMD64)
+*   **Topology Design:**
+    *   **WAN (Wide Area Network):** Bridged to physical host internet for external reachability.
+    *   **LAN (Local Area Network):** Isolated "Host-Only" segment (`192.168.1.0/24`) to prevent lab experiments from leaking into the barracks network.
+*   **Key Concept:** This phase served as the logical blueprint for transitioning from laptop-based VMs to a dedicated bare-metal server environment.
+
+## Phase 3: Bare-Metal Infrastructure & Hypervisor Migration
+**Status:** ACTIVE  
+**Objective:** Migrate the virtual laboratory to a dedicated 24/7 physical server (Type-1 Hypervisor).
+
+### Hardware Implementation:
+*   **Host:** Dell Optiplex 7040 SFF
+*   **Storage:** Successfully installed a 1TB HDD for VM/ISO storage capacity.
+*   **Boot Media:** Provisioned Proxmox VE 8.4 using Rufus (DD Image Mode) for UEFI compatibility.
+*   **Thermal Management:** Performed physical audit and cable management to ensure optimal airflow for 24/7 operations.
+
+### Networking & Connectivity (Barracks/Boingo Workaround):
+*   **Gateway:** Windows Internet Connection Sharing (ICS) via Cat6 Ethernet bridge from Main PC.
+*   **Static Management:** Assigned `192.168.137.10` for Web GUI access.
+*   **DNS:** 8.8.8.8 (Google Public DNS) to bypass local captive portal resolution issues.
+
+### Skills Demonstrated:
+*   **Hardware Lifecycle Management:** Physical hardware installation and BIOS optimization (VT-x/VT-d, AHCI).
+*   **Layer 1 & 2 Troubleshooting:** Diagnosing inactive wall jacks and implementing a successful Ethernet bridge.
+*   **Enterprise Hypervisor Management:** Configuring Proxmox repositories (No-Subscription) and performing system-wide updates via CLI.
 
 ## Phase 4: Environment Synchronization & Service Validation
-- **Status:** COMPLETE
-- **Infrastructure:** Successfully provisioned a local Apache2 web server to act as a development dashboard.
-- **Environment:** Configured a "Mirror Environment" between Windows 11 (Host) and Linux Mint 22 (Guest). 
-- **Tooling:** Installed and configured Git on the guest OS; successfully cloned the repository to unify the workflow.
-- **Verification:** Service `apache2` is persistent and verified active. System is now ready for Network Automation and CCNA-level labbing.
-- [x] **Host-Based Firewall:** Active and configured via UFW.
-- [x] **Traffic Filtering:** 
-    - **Permitted:** Port 80 (HTTP) for web server access.
-    - **Denied:** ICMP (Ping) protocol to prevent network discovery/reconnaissance.
-- [x] **Verification:** Confirmed external access to Apache via Host OS browser while simultaneously verifying ICMP packet drops.
+**Status:** COMPLETE (VMware Legacy)  
+**Objective:** Synchronized development workflow between Host (Windows 11) and Guest (Linux Mint).
 
-## Lab Verification & Environment Audit
-- **Deployment Platform:** Linux Mint 22 (VMware Workstation Pro)
-- **Toolchain Verified:** - [x] VS Code Settings Sync (Cross-platform parity achieved)
-    - [x] Git/GitHub Integration (Write-access confirmed from Guest OS)
-    - [x] Web Infrastructure (Apache2 active and serving on Port 80)
-- **Hardware Status:** Disk expanded to 60GB; system resources optimized for CCNA simulation.
-    - [x] Network Telemetry: Successfully captured and analyzed Layer 2-4 traffic using Wireshark; verified TCP 3-way handshake on Port 80
-    - [x] ICMP Diagnostics: Analyzed ICMP Echo Request/Reply sequences to verify Layer 3 reachability and gateway performance.
+*   **Tooling:** Installed and configured Git on the guest OS; successfully unified the workflow via GitHub.
+*   **Verification:** Service `apache2` verified active. 
+*   **Lab Audit:** 
+    *   [x] VS Code Settings Sync achieved.
+    *   [x] Web Infrastructure (Apache2 active and serving on Port 80).
+    *   [x] Network Telemetry analyzed via Wireshark.
 
- ### Environment Technical Specifications
+### Legacy Environment Technical Specifications
 - **Hypervisor:** VMware Workstation Pro 17
 - **Guest OS:** Linux Mint 22 (Cinnamon)
 - **Virtual Resources:** 2 vCPUs, 4GB RAM, 60GB Virtual Disk (NVMe)
 - **Network Mode:** NAT (Network Address Translation) with DHCP
-- **Key Tools:** Wireshark, Git, Apache2, UFW (Uncomplicated Firewall)

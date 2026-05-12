@@ -93,3 +93,17 @@ I maintain a synchronized lab environment across two primary machines to ensure 
 - **Guest OS:** Linux Mint 22 (Cinnamon)
 - **Virtual Resources:** 2 vCPUs, 4GB RAM, 60GB Virtual Disk (NVMe)
 - **Network Mode:** NAT (Network Address Translation) with DHCP
+
+## Phase 5: Containerization & Modern App Deployment (Docker)
+**Status:** INITIALIZING
+**Objective:** Transition from monolithic VMs to lightweight, portable containers using Docker.
+
+### Implementation Strategy:
+*   **The "Docker Host" VM:** Provisioning a dedicated Ubuntu Server 24.04 VM to serve as a high-density container engine.
+*   **Media Services:** Planning the deployment of **Jellyfin** via Docker Compose to leverage the 1TB physical storage for media streaming.
+*   **System Optimization:** Moving away from heavy GUI-based VMs to "Headless" CLI-based server management to save system resources.
+
+### Tech Stack:
+*   **Runtime:** Docker / Docker Compose
+*   **Target Apps:** Jellyfin (Media), Pi-Hole (DNS/Ad-Block), Home Assistant (Automation)
+*   **Storage Mapping:** Utilizing Docker Volumes to map physical HDD paths directly to virtualized app containers.

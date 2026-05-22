@@ -41,6 +41,8 @@ I maintain a synchronized lab environment across two primary machines:
 **Status:** ACTIVE  
 **Objective:** Transitioning from monolithic VMs to high-density, portable containers.
 
+---
+
 ### Implementation & Successes:
 * **Headless Architecture:** Deployed a dedicated **Ubuntu Server 24.04 VM** on Proxmox, optimized for CLI management.
 * **Storage Orchestration:** Successfully expanded LVM and Ubuntu-LV partitions to claim 100% of the 30GB provisioned disk.
@@ -62,3 +64,23 @@ I maintain a synchronized lab environment across two primary machines:
 ## Troubleshooting Log
 - **May 2026:** Encountered "Low Disk Space" warning. Scaled VM Virtual Disk from 20GB to 60GB using GParted.
 - **May 2026:** Jellyfin "Restarting" Loop (Error 139). Fixed by resetting ownership (`chown`) of config directories and switching to bridge network mode.
+
+## Network Topology and Signal/Data Flow
+       [ INTERNET (Boingo Wireless Gateway) ]
+                         |
+                 (Wi-Fi Interface)
+                         |
+                [ HOST WORKSTATION ] 
+        (Windows Defender Firewall - Inbound Block)
+                         |
+       (Windows ICS NAT Engine / Gateway: 192.168.137.1)
+                         |  [Allowed Subnet Rule: 192.168.137.0/24]
+                  (Ethernet Cable)
+                         |
+           [ BARE-METAL SERVER (Optiplex) ]
+             (Proxmox VE Hypervisor / vmbr0)
+                         |
+        [ UBUNTU SERVER VM (docker-host: 192.168.137.50) ]
+        (Docker Engine Platform -> Bridge Network Layer)
+                         |
+           [ CONTAINER SERVICES (Jellyfin, etc.) ]

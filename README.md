@@ -38,10 +38,8 @@ I maintain a synchronized lab environment across two primary machines:
 **Verification:** Unified workflow between Host (Windows 11) and Guest (Linux Mint) via Git.
 
 ## Phase 5: Containerization & Modern App Deployment (Docker)
-**Status:** ACTIVE  
+**Status:** COMPLETED  
 **Objective:** Transitioning from monolithic VMs to high-density, portable containers.
-
----
 
 ### Implementation & Successes:
 * **Headless Architecture:** Deployed a dedicated **Ubuntu Server 24.04 VM** on Proxmox, optimized for CLI management.
@@ -55,32 +53,56 @@ I maintain a synchronized lab environment across two primary machines:
 
 ---
 
+## Phase 6: Reverse Proxying, Local Routing & Unified Monitoring (NOC)
+**Status:** ACTIVE  
+**Objective:** Decoupling raw backend port numbers from user-facing services, establishing local DNS routing, and spinning up a real-time network monitoring fabric.
+
+### Implementation & Successes:
+* **Layer 7 Reverse Proxying:** Deployed **Nginx Proxy Manager (NPM)** in a Docker container to orchestrate clean inbound traffic routing rules.
+* **Local DNS Routing:** Configured local loopback mapping via the Windows `hosts` phonebook file, enabling port-free domain entry (e.g., `http://jellyfin.local`, `http://homepage.local`, `http://uptime.local`).
+* **Persistent WebSockets:** Injected custom Nginx advanced location headers (`Upgrade $http_upgrade` and `Connection "upgrade"`) to handle reactive, real-time data streaming layers.
+* **Service Availability Fabric:** Deployed **Uptime Kuma** to build a continuous health grid. Implemented Layer 3 ICMP Echo checks to track bare-metal hypervisor hardware latency alongside Layer 7 HTTP verification paths for software runtimes.
+* **Dynamic Operations Dashboard:** Upgraded **Homepage** from a static landing panel into a live metrics console, leveraging native API integrations to pull active session statistics from Jellyfin and route totals from NPM.
+
+### Technical Challenges Resolved:
+* **ECONNREFUSED on Secure Handshakes:** Resolved an Uptime Kuma connection failure hitting the Proxmox Hypervisor web UI. Patched by transitioning the monitor from raw TCP probing to an HTTP(s) check, enabling SSL validation bypasses for self-signed certificates, and broadening accepted status codes to `200-499`.
+* **Cross-Subnet IP Misalignments:** Remedied a connection mismatch where application targets were mistakenly mapped to the VM instance host (`192.168.137.50`) rather than the bare-metal management node (`192.168.137.141`).
+* **Resource Constraint Isolation:** Diagnosed a high memory warning (91.65% RAM usage) on the Homepage dashboard. Discovered disk storage was actually stable at 43% (12GB/30GB used), confirming memory saturation across the 4GB VM allocation and isolating the immediate need for a physical RAM upgrade over disk cleanup.
+
+---
+
 ## Skills Demonstrated
-* **Linux Administration:** LVM management, partition resizing, and system-wide updates.
-* **Containerization:** Docker/Docker Compose, YAML syntax, and lifecycle management.
-* **Network Engineering:** Port mapping, SSH/SCP for remote admin, and virtual bridge troubleshooting.
-* **Hardware Lifecycle:** Physical installation, BIOS optimization, and thermal management.
+* **Linux Administration:** LVM management, partition resizing, system journal maintenance (`journalctl`), and container system pruning.
+* **Containerization:** Docker/Docker Compose orchestration, YAML syntax, volume mappings, and container log management.
+* **Network Engineering:** Layer 7 Reverse Proxy management, WebSocket headers, local DNS routing adjustments, cross-subnet routing troubleshooting, and ICMP vs HTTP telemetry.
+* **Hardware Lifecycle:** Physical installation, BIOS optimization, thermal management, and resource provisioning planning (RAM constraints analysis).
 
 ## Troubleshooting Log
 - **May 2026:** Encountered "Low Disk Space" warning. Scaled VM Virtual Disk from 20GB to 60GB using GParted.
 - **May 2026:** Jellyfin "Restarting" Loop (Error 139). Fixed by resetting ownership (`chown`) of config directories and switching to bridge network mode.
+- **May 2026:** Proxmox SSL Certificate Verification Failure in Uptime Kuma. Resolved by utilizing a direct Layer 3 Ping check to isolate the bare-metal NIC health without standard HTTPS handshake friction.
+- **May 2026:** Homepage Dashboard memory exhaustion flag (91.65%). Conducted environment-wide image and system volume prune (`docker system prune -a --volumes -f`), identifying allocation limits on the Proxmox VM profile layer.
 
 ## Network Topology and Signal/Data Flow
-       [ INTERNET (Boingo Wireless Gateway) ]
-                         |
-                 (Wi-Fi Interface)
-                         |
-                [ HOST WORKSTATION ] 
-        (Windows Defender Firewall - Inbound Block)
-                         |
-       (Windows ICS NAT Engine / Gateway: 192.168.137.1)
-                         |  [Allowed Subnet Rule: 192.168.137.0/24]
-                  (Ethernet Cable)
-                         |
-           [ BARE-METAL SERVER (Optiplex) ]
-             (Proxmox VE Hypervisor / vmbr0)
-                         |
+
+        [ INTERNET (Boingo Wireless Gateway) ]
+                           |
+                    (Wi-Fi Interface)
+                           |
+                  [ HOST WORKSTATION ] 
+          (Windows Defender Firewall - Inbound Block)
+                           |
+         (Windows ICS NAT Engine / Gateway: 192.168.137.1)
+                           |  [Allowed Subnet Rule: 192.168.137.0/24]
+                    (Ethernet Cable)
+                           |
+             [ BARE-METAL SERVER (Optiplex) ]
+               (Proxmox VE Hypervisor: 192.168.137.141)
+                           |
         [ UBUNTU SERVER VM (docker-host: 192.168.137.50) ]
-        (Docker Engine Platform -> Bridge Network Layer)
-                         |
-           [ CONTAINER SERVICES (Jellyfin, etc.) ]
+          (Docker Engine Platform -> Bridge Network Layer)
+            │              │               │             │
+            ▼              ▼               ▼             ▼
+      [:80 / :81]       [:8096]         [:3001]       [:3000]
+     [ Nginx Proxy ]  [ Jellyfin ]    [ Uptime Kuma ] [ Homepage ]
+     [   Manager   ]  (jellyfin.local) (uptime.local) (homepage.local)

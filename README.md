@@ -103,6 +103,7 @@ I maintain a synchronized lab environment across my physical bare-metal hardware
 
 ## Network Topology and Signal/Data Flow
 
+```text
     [ INTERNET (Boingo Wireless Gateway) ]
                        |
                 (Wi-Fi Interface)

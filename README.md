@@ -11,19 +11,20 @@ Transitioning from USMC Satellite/SMART-T Operator (0627/0628) to Civilian Netwo
 I maintain a synchronized lab environment across my physical bare-metal hardware and mobile testing platforms:
 * **Primary Workstation (PC):** Resource-heavy management, remote orchestration, and documentation sync.
 * **Mobile Station (Asus ROG G16):** "On-the-go" labbing and field deployment testing.
-* **Bare-Metal Node:** Dedicated enterprise hypervisor node hosting isolated target networks.
-* **Synchronization:** Infrastructure configurations managed via Git/GitHub for 1:1 cross-platform parity.
+* **Bare-Metal Node:** Dedicated enterprise hypervisor node operating as a completely independent, headless server.
+* **Synchronization:** Infrastructure configurations and setup logs managed via GitHub for version control and career transition tracking.
 
 ---
 
-## Bare-Metal Hardware & Storage Tiering Architecture
-Following a critical hardware modernization and disaster recovery event in **June 2026**, the bare-metal virtualization node was completely overhauled from a clean-slate state to maximize IOPS performance and system memory overhead.
+## Bare-Metal Hardware & Network Architecture
+Following a critical hardware modernization in June 2026 and an advanced network re-engineering phase in July 2026, the bare-metal virtualization node was transitioned into a fully independent deployment to bypass restrictive barracks Wi-Fi captive portals (Boingo).
 
 * **Host Machine:** Dell OptiPlex 7040 Small Form Factor (SFF)
-* **System Memory:** 24 GB DDR4 RAM (Upgraded with 16GB SK Hynix module; ~23.36 GiB recognized pool under hypervisor overhead)
-* **Primary Storage (OS & Core High-IOPS Pools):** 256GB Samsung NVMe SSD (Sourced via local hardware exchange)
-* **Secondary Storage (Bulk Data/ISO Storage Vault):** 500GB Mechanical HDD (Restored baseline drive)
-* **Hypervisor Platform:** Proxmox VE 8.4 (Clean Slate Environment)
+* **System Memory:** 24 GB DDR4 RAM (~23.36 GiB hypervisor pool)
+* **Primary Storage:** 256GB Samsung NVMe SSD (High-IOPS Core/VM Provisioning)
+* **Secondary Storage:** 500GB Mechanical HDD (Bulk Data/ISO Vault)
+* **Hypervisor Platform:** Proxmox VE 8.4
+* **Hardware State:** 100% Headless (Unplugged local keyboard/monitor; entirely managed via remote orchestration over private Wi-Fi network)
 
 ---
 
@@ -53,19 +54,21 @@ Following a critical hardware modernization and disaster recovery event in **Jun
 * **Status:** COMPLETE
 * **Verification:** Re-secured unified workflow between Host (Windows 11) and Guest systems using remote repository access frameworks.
 
-### Phase 5: Containerization & Modern App Deployment (Docker Platform)
-* **Status:** TARGETED FOR REDEPLOYMENT (Clean Slate Migration)
-* **Historical Benchmarks Achieved:**
-  * **Headless Architecture:** Deployed a dedicated Ubuntu Server 24.04 VM on Proxmox, optimized for CLI management.
-  * **Storage Orchestration:** Successfully expanded LVM and Ubuntu-LV partitions to claim 100% of a 30GB provisioned disk.
-  * **Docker Compose Workflow:** Standardized application deployment using YAML blueprints. Successfully deployed Jellyfin Media Server.
-  * **Guest Agent Integration:** Configured `qemu-guest-agent` for real-time IP telemetry between Proxmox and Ubuntu Guest.
-* **Technical Challenges Resolved:**
-  * **Exit Code 139 (Segmentation Fault):** Diagnosed a Jellyfin boot-loop caused by a UID/GID mismatch. Resolved by correcting directory permissions and adjusting volume mapping.
-  * **Networking:** Implemented 8096:8096 port mapping to ensure reachability across the Windows ICS bridge.
+### Phase 5: Hypervisor Isolation, Subnet Migration & Captive Portal Bypass
+* **Status:** COMPLETED (July 2026)
+* **Objective:** Eliminate dependency on a host PC's Windows Internet Connection Sharing (ICS) bridge, bypass the Boingo network captive portal, and establish an independent, headless server infrastructure.
+* **Implementation Details:**
+    * **WISP Travel Router Deployment:** Integrated a GL.iNet Opal (SFT1200) pocket travel router into the topology. Spoofed the MAC address identity of a previously authenticated device onto the router's Repeater interface to cleanly bridge the Boingo captive portal wall.
+    * **Breaking Host Dependency:** Hardwired the OptiPlex's physical network interface directly to the Opal router's LAN 1 interface, establishing a secure, isolated local gateway independent of the primary workstation.
+    * **Proxmox Subnet Migration:** Logged into the physical Proxmox host shell via local console one final time to manually edit the network interfaces configuration file (`/etc/network/interfaces`). Migrated the legacy `192.168.137.x` static IP over to the Opal's native `192.168.8.x` subnet.
+    * **Network Interface Reconfiguration:** * Assigned a clean static IP address pool to the primary network bridge (`vmbr0`): `192.168.8.2/24`.
+        * Re-routed the default hypervisor gateway traffic directly through the Opal router interface: `gateway 192.168.8.1`.
+        * Updated upstream DNS criteria inside `/etc/resolv.conf` to target the new local gateway (`nameserver 192.168.8.1`) for nameserver validation.
+    * **Headless Server Execution:** Validated full hypervisor outbound internet connectivity via ICMP testing from the Proxmox shell. Confirmed remote reachability to the Proxmox Web GUI over secure Wi-Fi (`https://192.168.8.2:8006`). Disconnected all local monitors, keyboards, and peripheral hardware to lock the OptiPlex into its finalized standalone headless server footprint.
 
-### Phase 6: Reverse Proxying, Local Routing & Unified Monitoring (NOC)
+### Phase 6: Containerization & Modern App Deployment (Docker Platform)
 * **Status:** TARGETED FOR REDEPLOYMENT (Clean Slate Migration)
+* **Planned Tasks:** Re-provision automated headless Linux environments (Ubuntu Server CLI) on the new subnet architecture, utilize optimized Docker Compose YAML blueprints with persistent volume mapping, and integrate `qemu-guest-agent` for live hypervisor network telemetry.
 * **Historical Benchmarks Achieved:**
   * **Layer 7 Reverse Proxying:** Deployed Nginx Proxy Manager (NPM) in a Docker container to orchestrate clean inbound traffic routing rules.
   * **Local DNS Routing:** Configured local loopback mapping via the Windows hosts file, enabling port-free domain entry (e.g., `http://jellyfin.local`, `http://homepage.local`, `http://uptime.local`).
@@ -77,9 +80,9 @@ Following a critical hardware modernization and disaster recovery event in **Jun
   * **Cross-Subnet IP Misalignments:** Remedied a connection mismatch where application targets were mistakenly mapped to the VM instance host (192.168.137.50) rather than the bare-metal management node (192.168.137.141).
   * **Resource Constraint Isolation:** Diagnosed a high memory warning (91.65% RAM usage) on the Homepage dashboard. Discovered disk storage was stable at 43% (12GB/30GB used), confirming memory saturation across the 4GB VM allocation and isolating the immediate need for a physical RAM upgrade over disk cleanup.
 
-### Phase 7: Offensive Security, Penetration Testing Labs & Cross-Platform Migrations
-* **Status:** ACTIVE (Target Environment Reconstruction)
-* **Objective:** Building a sandboxed, air-gapped Layer 2/3 virtual local area network (VLAN/LAN) inside Proxmox to practice penetration testing, live exploitation, and network posture analysis tailored for Network+ and civilian infrastructure security roles.
+### Phase 7: Reverse Proxying, WireGuard/Tailscale Mesh VPN & Remote Access
+* **Status:** IN PROGRESS
+* **Objective:** Orchestrate Layer 7 traffic routing via Nginx Proxy Manager and establish secure, encrypted outbound overlay networks using Tailscale to tunnel into the barracks lab environment from external networks or cellular data without opening insecure firewall vectors.
 * **Historical Benchmarks Achieved:**
   * **Air-Gapped Infrastructure Routing:** Provisioned a standalone Linux Bridge (`vmbr1`) inside Proxmox *without physical NIC binding* to orchestrate an air-gapped virtual switch isolated entirely within server RAM.
   * **Offline Attacker Deployment:** Deployed a Kali Linux VM using a full 4.7 GB offline installer image, safely bypassing external gateway dependencies during network configuration.
@@ -112,6 +115,7 @@ Following a critical hardware modernization and disaster recovery event in **Jun
 * **June 2026:** VMware `.vmdk` deployment constraint inside Proxmox Web UI. Mitigated by staging payloads under secure Linux mount nodes (`/var/tmp/`) and running an out-of-band `qm importdisk` array to enforce raw logical volume creation.
 * **June 2026:** Immutable hard drive lockup during a data-wipe cycle on an enterprise-sourced 1 TB drive. Reverted storage topology back to a stable 500 GB HDD to isolate the environment from controller blocks.
 * **June 2026:** Lost Web GUI management connectivity to Proxmox. Traced to a stale manual IP routing parameter inside the Windows network connections engine (`ncpa.cpl`). Fixed by dynamically synchronizing the active subnets.
+* **July 2026:** Lost network management plane connectivity during environment optimization due to an outdated host PC network bridge. Resolved by provisioning a hardware-based WISP travel router (GL.iNet Opal), migrating the Proxmox hypervisor interfaces file (`/etc/network/interfaces`) from `192.168.137.x` to a fresh `192.168.8.x` subnet pool, and establishing a 100% independent headless architecture.
 
 ---
 

@@ -81,8 +81,8 @@ Following a critical hardware modernization in June 2026 and an advanced network
   * **Resource Constraint Isolation:** Diagnosed a high memory warning (91.65% RAM usage) on the Homepage dashboard. Discovered disk storage was stable at 43% (12GB/30GB used), confirming memory saturation across the 4GB VM allocation and isolating the immediate need for a physical RAM upgrade over disk cleanup.
 
 ### Phase 7: Reverse Proxying, WireGuard/Tailscale Mesh VPN & Remote Access
-* **Status:** IN PROGRESS
-* **Objective:** Orchestrate Layer 7 traffic routing via Nginx Proxy Manager and establish secure, encrypted outbound overlay networks using Tailscale to tunnel into the barracks lab environment from external networks or cellular data without opening insecure firewall vectors.
+* **Status:** COMPLETED (July 2026)
+* **Objective:** Establish secure, encrypted outbound overlay networks using Tailscale to tunnel into the barracks lab environment from external networks or cellular data without opening insecure firewall vectors.
 * **Historical Benchmarks Achieved:**
   * **Air-Gapped Infrastructure Routing:** Provisioned a standalone Linux Bridge (`vmbr1`) inside Proxmox *without physical NIC binding* to orchestrate an air-gapped virtual switch isolated entirely within server RAM.
   * **Offline Attacker Deployment:** Deployed a Kali Linux VM using a full 4.7 GB offline installer image, safely bypassing external gateway dependencies during network configuration.
@@ -91,6 +91,20 @@ Following a critical hardware modernization in June 2026 and an advanced network
 * **Technical Challenges Resolved:**
   * **Boot Order and Installer Loops:** Fixed an installation loop where Kali Linux kept booting into the live installation ISO post-reboot. Resolved by unmounting the virtual media device and re-indexing the SeaBIOS device boot order priorities.
   * **Linux Directory & Literal File Parsing Errors:** Troubleshooted file execution boundaries within the Linux terminal where literal character omissions threw non-existent file exceptions during storage attachments. Corrected volume maps dynamically via command-line flags.
+
+* **Historical Benchmarks Achieved:**
+  * **Air-Gapped Infrastructure Routing:** Provisioned a standalone Linux Bridge (vmbr1) inside Proxmox without physical NIC binding to orchestrate an air-gapped virtual switch isolated entirely within server RAM.
+  * **Offline Attacker Deployment:** Deployed a Kali Linux VM using a full 4.7 GB offline installer image, safely bypassing external gateway dependencies during network configuration.
+  * **Enterprise V2V Migration (VMware to Proxmox):** Managed a cross-platform migration of an intentionally vulnerable enterprise target (Metasploitable2). Leveraged Secure File Transfer Protocol (SFTP) via WinSCP to push legacy VMware disk arrays directly to Proxmox server filesystems.
+  * **CLI Disk Conversion Orchestration:** Executed low-level hypervisor management via the Proxmox CLI (qm importdisk) to dynamically transcode a .vmdk disk volume into a high-performance, bare-metal native block-level raw storage architecture mapped to LVM-Thin storage.
+  * **Secure Mesh Networking:** Deployed Tailscale daemon directly on the Proxmox bare-metal host to create a private, encrypted mesh network.
+  * **Tailscale Serve Orchestration:** Configured tailscale serve as a lightweight proxy to map internal services to the Tailscale mesh, executing tailscale serve --bg https+insecure://localhost:8006 to bridge the Proxmox Web GUI to a dedicated Tailscale MagicDNS domain.
+* **Technical Challenges Resolved:**
+  * **Boot Order and Installer Loops:** Fixed an installation loop where Kali Linux kept booting into the live installation ISO post-reboot. Resolved by unmounting the virtual media device and re-indexing the SeaBIOS device boot order priorities.
+  * **Linux Directory & Literal File Parsing Errors:** Troubleshooted file execution boundaries within the Linux terminal where literal character omissions threw non-existent file exceptions during storage attachments. Corrected volume maps dynamically via command-line flags.
+  * **VPN/Tunnel Routing Conflicts:** Resolved ERR_TUNNEL_CONNECTION_FAILED errors on the host workstation by adding the Tailscale MagicDNS domain ([https://proxmox.tail4754ec.ts.net/](https://proxmox.tail4754ec.ts.net/)) as an explicit split-tunneling exclusion within the NordVPN client settings.
+  * **Command-Line Authority:** Mitigated sudo: command not found errors by leveraging the root-level shell access inherent to the Proxmox node for direct Tailscale service management.
+  * **Latency Mitigation:** Diagnosed connectivity timeouts caused by weak cellular signal (1-bar) and confirmed that the underlying tailscale serve proxy architecture is fully operational once the signal threshold is stabilized.
 
 ---
 
@@ -115,36 +129,39 @@ Following a critical hardware modernization in June 2026 and an advanced network
 * **June 2026:** VMware `.vmdk` deployment constraint inside Proxmox Web UI. Mitigated by staging payloads under secure Linux mount nodes (`/var/tmp/`) and running an out-of-band `qm importdisk` array to enforce raw logical volume creation.
 * **June 2026:** Immutable hard drive lockup during a data-wipe cycle on an enterprise-sourced 1 TB drive. Reverted storage topology back to a stable 500 GB HDD to isolate the environment from controller blocks.
 * **June 2026:** Lost Web GUI management connectivity to Proxmox. Traced to a stale manual IP routing parameter inside the Windows network connections engine (`ncpa.cpl`). Fixed by dynamically synchronizing the active subnets.
-* **July 2026:** Lost network management plane connectivity during environment optimization due to an outdated host PC network bridge. Resolved by provisioning a hardware-based WISP travel router (GL.iNet Opal), migrating the Proxmox hypervisor interfaces file (`/etc/network/interfaces`) from `192.168.137.x` to a fresh `192.168.8.x` subnet pool, and establishing a 100% independent headless architecture.
+* **July 2026:** Lost network management plane connectivity during environment optimization due to an outdated host PC network bridge. Resolved by provisioning a hardware-based WISP travel router (GL.iNet Opal), migrating the Proxmox hypervisor interfaces file (/etc/network/interfaces) from 192.168.137.x to a fresh 192.168.8.x subnet pool, and establishing a 100% independent headless architecture.
+* **July 2026:** Implemented secure remote administration via Tailscale mesh VPN. Resolved routing conflicts between local network VPN extensions (NordVPN) and the Tailscale overlay network by configuring split-tunneling exclusions.
+* **July 2026:** Successfully transitioned Proxmox Web GUI management from local 192.168.8.2 subnet access to a secure, proxy-based [https://proxmox.tail4754ec.ts.net/](https://proxmox.tail4754ec.ts.net/) domain.
 
 ---
 
 ## Network Topology and Signal/Data Flow
 
 ```text
-    [ INTERNET (Boingo Wireless Gateway) ]
+      [ INTERNET (Boingo Wireless Gateway) ]
                        |
-                (Wi-Fi Interface)
+             (Wi-Fi Repeater Interface)
                        |
-              [ HOST WORKSTATION ] 
-      (Windows Defender Firewall - Inbound Block)
+           [ GL.iNet Opal Travel Router ]
+      (Gateway: 192.168.8.1 / Subnet: 192.168.8.0/24)
                        |
-     (Windows ICS NAT Engine / Gateway: 192.168.137.1)
-                       |  [Allowed Subnet Rule: 192.168.137.0/24]
                 (Ethernet Cable)
                        |
-         [ BARE-METAL SERVER (Optiplex) ]
-           (Proxmox VE Hypervisor: 192.168.137.141)
+          [ BARE-METAL SERVER (Optiplex) ]
+          (Proxmox VE Hypervisor: 192.168.8.2)
+                       |
+          [ TAILSCALE OVERLAY NETWORK ]
+          (Secure Mesh Tunnel / MagicDNS)
                        |
         ┌──────────────┴────────────────────────┐
         │                                       │
   [ PRODUCTION BRIDGE: vmbr0 ]            [ ISOLATED LAB BRIDGE: vmbr1 ]
         │                                 (Air-Gapped / No Physical NIC)
   [ UBUNTU SERVER VM ]                          │
-  (docker-host: 192.168.137.50)                 ├──────────────────────────────┐
+  (docker-host: 192.168.8.50)                   ├──────────────────────────────┐
         │                                       │                              │
-  (Docker Engine Platform)             [ KALI ATTACKER VM ]         [ METASPLOITABLE TARGET VM ]
-   ├── [:80 / :81] Nginx Proxy Mgr       (Static IP Staging)            (Static IP Staging)
+  (Docker Engine Platform)             [ KALI ATTACKER VM ]      [ METASPLOITABLE TARGET VM ]
+   ├── [:80 / :81] Nginx Proxy Mgr      (Static IP Staging)        (Static IP Staging)
    ├── [:8096] Jellyfin Media           
-   ├── [:3001] Uptime Kuma NOC           
+   ├── [:3001] Uptime Kuma NOC          
    └── [:3000] Homepage Dashboard

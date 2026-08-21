@@ -137,34 +137,38 @@ Following a critical hardware modernization in June 2026 and an advanced network
 * **August 2026:** Lost Tailscale mesh connectivity to the Proxmox host following a full power-cycle of the GL.iNet Opal WISP router. Root-caused to a Boingo Wireless captive-portal session collision — the router authenticated to the portal under a distinct, randomized WAN MAC (not cloned from a trusted device), but was labeled with a device identity ("Main PC") already claimed by another actively authenticated device on the same SSID. Resolved by re-authenticating the router to the portal under a distinct device identity, restoring WAN uplink and MagicDNS reachability.
 * **August 2026:** Locked out of remote Proxmox Web GUI access (`:8006`) over the Tailscale overlay after enabling the Datacenter-level firewall without first provisioning explicit Accept rules. Diagnosed via `tailscale status`, which showed an active relay session to the host with outbound bytes transmitted but zero bytes received (`tx 8580 rx 0`), confirming inbound packet drop at the host firewall layer. Restored access by disabling the Datacenter firewall pending proper rule provisioning (`TCP/8006`, `TCP/22`) scoped to the Tailscale CGNAT range (`100.64.0.0/10`).
 * **August 2026:** Ubuntu Server VM (VM 100) failed to acquire a DHCP lease after spinning up OPNsense (VM 103) on internal bridge `vmbr1`. Resolved by fixing reversed OPNsense virtual interface assignments (`vtnet0` WAN / `vtnet1` LAN), restarting the Kea DHCP daemon via backend shell (`configctl kea restart`), configuring explicit `dhcp4: true` inside Ubuntu's Netplan config (`/etc/netplan/01-netcfg.yaml`), and executing a link-state bounce (`sudo ip link set ens18 down && sudo ip link set ens18 up`) to secure dynamic IP `192.168.1.185` with 0% ping packet loss to `1.1.1.1`.
+* **August 2026:** Experienced GUI access loss and traffic drops on Kali Linux (`VM 101`) connected to the new `OPT1` interface (`vmbr2`). Identified default-deny stateful firewall blocking on unconfigured OPNsense interfaces. Bypassed packet filtering temporarily (`pfctl -d`), added a permanent IPv4 Pass-All rule for the `OPT1` network, tuned Kali XFCE display/screensaver power options to prevent idle lockups, and re-engaged the packet filter (`pfctl -e`) to lock in full outbound NAT and DNS functionality.
 
 ---
 
 ## Network Topology and Signal/Data Flow
 
 ```text
-    [ INTERNET (Boingo Wireless Gateway) ]
+[ INTERNET (Boingo Wireless Gateway) ]
                      |
             (Wi-Fi Repeater Interface)
                      |
           [ GL.iNet Opal Travel Router ]
-      (WISP Gateway / Private Subnet)
+           (WISP Gateway / Private Subnet)
                      |
               (Ethernet Cable)
                      |
-       [ BARE-METAL SERVER (Optiplex) ]
-           (Proxmox VE Hypervisor)
+       [ BARE-METAL SERVER (OptiPlex 7040) ]
+            (Proxmox VE Hypervisor)
                      |
        [ TAILSCALE OVERLAY NETWORK ]
        (Secure Mesh Tunnel / MagicDNS)
                      |
         [ OPNsense ROUTER VM 103 ]
-        (Gateway / Kea DHCP Server)
-                     |
-        [ ISOLATED LAB BRIDGE: vmbr1 ]
-        (Air-Gapped / No Physical NIC)
-                     |
-       ┌─────────────┴─────────────┬───────────────────────────┐
-       │                           │                           │
-[ UBUNTU SERVER VM 100 ]   [ KALI ATTACKER VM 101 ]   [ METASPLOITABLE TARGET VM 102 ]
-(Application Host)         (Ethical Hacking Source)   (Vulnerable Target Scope)
+        (Gateway / DHCP / Stateful Firewall)
+         /           |           \
+   vtnet0           vtnet1        vtnet2
+  (vmbr0 WAN)     (vmbr1 LAN)   (vmbr2 OPT1)
+  [WAN Subnet]    [LAN Subnet]  [OPT1 Subnet]
+                     |             |
+        ┌────────────┘             └──────────────────────────┐
+        │                                         ┌───────────┴───────────┐
+[ UBUNTU SERVER VM 100 ]                          │                       │
+   (Application Host)                    [ KALI ATTACKER VM 101 ]   [ METASPLOITABLE TARGET VM 102 ]
+      [DHCP Lease]                       (Ethical Hacking Source)      (Vulnerable Target Scope)
+                                               [DHCP Lease]

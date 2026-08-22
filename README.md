@@ -98,15 +98,17 @@ Following a critical hardware modernization in June 2026 and an advanced network
   * **Command-Line Authority:** Mitigated `sudo: command not found` errors by leveraging the root-level shell access inherent to the Proxmox node for direct Tailscale service management.
   * **Latency Mitigation:** Diagnosed connectivity timeouts caused by weak cellular signal (1-bar) and confirmed that the underlying tailscale serve proxy architecture is fully operational once the signal threshold is stabilized.
 
-### Phase 8: Virtualized Security Gateway & DHCP Engineering (OPNsense Integration)
+### Phase 8: Virtualized Security Gateway, DHCP Engineering & Tailscale Subnet Router (OPNsense Integration)
 * **Status:** COMPLETED (August 2026)
-* **Objective:** Deploy and configure an OPNsense virtual router gateway inside Proxmox to segment internal lab networks, manage firewall states, and run dynamic DHCP services for guest VMs (Ubuntu AppHost VM 100).
+* **Objective:** Deploy and configure an OPNsense virtual router gateway inside Proxmox to segment internal lab networks, manage firewall states, run dynamic DHCP services for guest VMs, and act as a persistent Tailscale subnet router.
 * **Implementation Details:**
-  * **Virtual Gateway Deployment (VM 103):** Provisioned OPNsense with dual virtual network interfaces (`vtnet0` for WAN mapped to `vmbr0`, and `vtnet1` for LAN mapped to the isolated internal bridge `vmbr1`).
-  * **DHCP Service Provisioning:** Configured the integrated Kea DHCP server on OPNsense to dynamically lease network addresses across the internal subnet (`192.168.1.0/24`).
+  * **Virtual Gateway Deployment (VM 103):** Provisioned OPNsense with multi-interface virtual network mappings (`vtnet0` WAN on `vmbr0`, `vtnet1` LAN on `vmbr1`, `vtnet2` OPT1 on `vmbr2`).
+  * **DHCP Service Provisioning:** Configured the integrated Kea DHCP server on OPNsense to dynamically lease network addresses across internal subnets (`192.168.1.0/24` and `192.168.2.0/24`).
+  * **Tailscale Subnet Router & Boot Persistence:** Configured Tailscale directly on OPNsense to advertise internal lab subnets (`192.168.1.0/24` and `192.168.2.0/24`). Solved FreeBSD `tcsh` history expansion parsing errors by encoding the boot hook as a base64 payload to safely deploy `/usr/local/etc/rc.syshook.d/start/99-tailscale`.
 * **Technical Challenges Resolved:**
   * **Interface Mismapping:** Traced initial routing failures to reversed virtual interface assignments between Proxmox bridges and OPNsense virtual devices. Corrected mappings using the OPNsense console menu (`Option 1`) and restarted the backend Kea DHCP service (`configctl kea restart`).
   * **Netplan Configuration & Link State:** Configured network parsing on the Ubuntu Server guest (VM 100) via `/etc/netplan/01-netcfg.yaml` to enforce active `dhcp4` on interface `ens18`. Bounced the link state (`sudo ip link set ens18 down && sudo ip link set ens18 up`) to force an immediate DHCP handshake, successfully pulling lease `192.168.1.185` with verified 0% packet loss outbound to `1.1.1.1`.
+  * **OPNsense FreeBSD Shell Parsing Issues:** Resolved shell syntax exceptions (`/bin/sh: Event not found`) when attempting to create a startup script under `csh`/`tcsh`. Bypassed character interpretation by generating the startup script via base64 decoding (`b64decode -r`) to guarantee `tailscaled` launches automatically on every OPNsense reboot.
 
 ---
 
@@ -117,6 +119,7 @@ Following a critical hardware modernization in June 2026 and an advanced network
 * **Linux Administration:** LVM-Thin volume management, raw partition block allocation, system journal maintenance (`journalctl`), and container system pruning.
 * **Containerization & Microservices:** Docker/Docker Compose orchestration, YAML syntax structure, volume persistence mappings, and isolated runtime logs.
 * **Network Engineering & Gateway Routing:** OSI Model Layers 2-7 manipulation, OPNsense firewall/router deployments, Kea DHCP service administration, Netplan interface configuration, Layer 7 Reverse Proxy rules, Secure WebSockets headers, custom local DNS tables, cross-subnet routing logic, and advanced ICMP/HTTP telemetry matrixing.
+* **VPN & Subnet Routing:** Tailscale mesh network integration, FreeBSD system startup hooks (`rc.syshook.d`), base64 shell script execution, and subnet route advertisement across virtualized lab networks.
 * **Offensive Security & Pentesting Labs:** Sandboxed virtual local area networking, vulnerability vectors tracking, target fingerprinting architecture, and security posture auditing.
 * **Enterprise Migrations (V2V):** Cross-platform virtual machine migrations, SFTP payload management, SSH server-key validation, and hypervisor CLI disk image transcoding.
 
@@ -138,6 +141,7 @@ Following a critical hardware modernization in June 2026 and an advanced network
 * **August 2026:** Locked out of remote Proxmox Web GUI access (`:8006`) over the Tailscale overlay after enabling the Datacenter-level firewall without first provisioning explicit Accept rules. Diagnosed via `tailscale status`, which showed an active relay session to the host with outbound bytes transmitted but zero bytes received (`tx 8580 rx 0`), confirming inbound packet drop at the host firewall layer. Restored access by disabling the Datacenter firewall pending proper rule provisioning (`TCP/8006`, `TCP/22`) scoped to the Tailscale CGNAT range (`100.64.0.0/10`).
 * **August 2026:** Ubuntu Server VM (VM 100) failed to acquire a DHCP lease after spinning up OPNsense (VM 103) on internal bridge `vmbr1`. Resolved by fixing reversed OPNsense virtual interface assignments (`vtnet0` WAN / `vtnet1` LAN), restarting the Kea DHCP daemon via backend shell (`configctl kea restart`), configuring explicit `dhcp4: true` inside Ubuntu's Netplan config (`/etc/netplan/01-netcfg.yaml`), and executing a link-state bounce (`sudo ip link set ens18 down && sudo ip link set ens18 up`) to secure dynamic IP `192.168.1.185` with 0% ping packet loss to `1.1.1.1`.
 * **August 2026:** Experienced GUI access loss and traffic drops on Kali Linux (`VM 101`) connected to the new `OPT1` interface (`vmbr2`). Identified default-deny stateful firewall blocking on unconfigured OPNsense interfaces. Bypassed packet filtering temporarily (`pfctl -d`), added a permanent IPv4 Pass-All rule for the `OPT1` network, tuned Kali XFCE display/screensaver power options to prevent idle lockups, and re-engaged the packet filter (`pfctl -e`) to lock in full outbound NAT and DNS functionality.
+* **August 2026:** Tailscale daemon failed to start automatically across OPNsense VM reboots due to FreeBSD environment quirks. Resolved by creating a startup hook script at `/usr/local/etc/rc.syshook.d/start/99-tailscale`. Overcame `csh` history expansion parsing crashes (`/bin/sh: Event not found`) by piping a base64 encoded string through `b64decode -r`, enabling clean persistent startup of `tailscaled` and route advertisement (`192.168.1.0/24`, `192.168.2.0/24`) without manual shell intervention.
 
 ---
 
@@ -157,7 +161,7 @@ Following a critical hardware modernization in June 2026 and an advanced network
             (Proxmox VE Hypervisor)
                      |
        [ TAILSCALE OVERLAY NETWORK ]
-       (Secure Mesh Tunnel / MagicDNS)
+       (Secure Mesh Tunnel / Subnet Router)
                      |
         [ OPNsense ROUTER VM 103 ]
         (Gateway / DHCP / Stateful Firewall)

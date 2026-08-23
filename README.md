@@ -68,18 +68,14 @@ Following a critical hardware modernization in June 2026 and an advanced network
     * **Headless Server Execution:** Validated full hypervisor outbound internet connectivity via ICMP testing from the Proxmox shell. Confirmed remote reachability to the Proxmox Web GUI over secure Wi-Fi (`https://192.168.8.2:8006`). Disconnected all local monitors, keyboards, and peripheral hardware to lock the OptiPlex into its finalized standalone headless server footprint.
 
 ### Phase 6: Containerization & Modern App Deployment (Docker Platform)
-* **Status:** TARGETED FOR REDEPLOYMENT (Clean Slate Migration)
-* **Planned Tasks:** Re-provision automated headless Linux environments (Ubuntu Server CLI) on the new subnet architecture, utilize optimized Docker Compose YAML blueprints with persistent volume mapping, and integrate `qemu-guest-agent` for live hypervisor network telemetry.
-* **Historical Benchmarks Achieved:**
-  * **Layer 7 Reverse Proxying:** Deployed Nginx Proxy Manager (NPM) in a Docker container to orchestrate clean inbound traffic routing rules.
-  * **Local DNS Routing:** Configured local loopback mapping via the Windows hosts file, enabling port-free domain entry (e.g., `http://jellyfin.local`, `http://homepage.local`, `http://uptime.local`).
-  * **Persistent WebSockets:** Injected custom Nginx advanced location headers (`Upgrade $http_upgrade` and `Connection "upgrade"`) to handle reactive, real-time data streaming layers.
-  * **Service Availability Fabric:** Deployed Uptime Kuma to build a continuous health grid. Implemented Layer 3 ICMP Echo checks to track bare-metal hypervisor hardware latency alongside Layer 7 HTTP verification paths for software runtimes.
-  * **Dynamic Operations Dashboard:** Upgraded Homepage from a static landing panel into a live metrics console, leveraging native API integrations to pull active session statistics from Jellyfin and route totals from NPM.
+* **Status:** IN PROGRESS / ACTIVE REDEPLOYMENT (August 2026)
+* **Objective:** Deploy production container workloads on Ubuntu Server (VM 100 on subnetwork `192.168.1.185`), establishing reverse proxying, operational dashboards, media streaming, and real-time monitoring.
+* **Implementation Details:**
+  * **Layer 7 Reverse Proxying:** Deployed Nginx Proxy Manager (NPM) in Docker Compose to orchestrate clean inbound HTTP routing rules for local domain aliases (`.lab`).
+  * **Dynamic Operations Dashboard:** Deployed Homepage as a unified management panel. Integrated native API authentication tokens to pull real-time media statistics from Jellyfin (`http://jellyfin.lab`) and active proxy routes from NPM.
+  * **Mobile Push Notification Architecture:** Configured Uptime Kuma monitoring with outbound `ntfy.sh` integration, delivering instant real-time push alerts to mobile devices upon service state changes.
 * **Technical Challenges Resolved:**
-  * **ECONNREFUSED on Secure Handshakes:** Resolved an Uptime Kuma connection failure hitting the Proxmox Hypervisor web UI. Patched by transitioning the monitor from raw TCP probing to an HTTP(s) check, enabling SSL validation bypasses for self-signed certificates, and broadening accepted status codes to 200-499.
-  * **Cross-Subnet IP Misalignments:** Remedied a connection mismatch where application targets were mistakenly mapped to the VM instance host (192.168.137.50) rather than the bare-metal management node (192.168.137.141).
-  * **Resource Constraint Isolation:** Diagnosed a high memory warning (91.65% RAM usage) on the Homepage dashboard. Discovered disk storage was stable at 43% (12GB/30GB used), confirming memory saturation across the 4GB VM allocation and isolating the immediate need for a physical RAM upgrade over disk cleanup.
+  * **NPM Internal Error on Local Domain SSL Generation:** Encountered Let's Encrypt verification failures (`Internal Error`) when requesting SSL certificates for internal `.lab` top-level domains. Diagnosed as an ACME HTTP-01 challenge failure due to Let's Encrypt public servers being unable to resolve private, non-routable `.lab` addresses. Resolved by reverting local host proxies to standard HTTP (`Port 80`), reserving ACME validation exclusively for public domain endpoints or DNS-01 challenges.
 
 ### Phase 7: Reverse Proxying, WireGuard/Tailscale Mesh VPN & Remote Access
 * **Status:** COMPLETED (July 2026)
@@ -117,7 +113,7 @@ Following a critical hardware modernization in June 2026 and an advanced network
 * **Systems & Infrastructure Engineering:** Component-level hardware deployment, secure data destruction mitigation, storage tiering (NVMe vs. HDD), and bare-metal hypervisor installation.
 * **Layer 3 Network Engineering:** Subnet masking configuration, Windows advanced adapter manipulation (`ncpa.cpl`), network gateway remediation, and routing infrastructure tracking.
 * **Linux Administration:** LVM-Thin volume management, raw partition block allocation, system journal maintenance (`journalctl`), and container system pruning.
-* **Containerization & Microservices:** Docker/Docker Compose orchestration, YAML syntax structure, volume persistence mappings, and isolated runtime logs.
+* **Containerization & Microservices:** Docker/Docker Compose orchestration, YAML syntax structure, volume persistence mappings, API authentication integration, and isolated runtime logs.
 * **Network Engineering & Gateway Routing:** OSI Model Layers 2-7 manipulation, OPNsense firewall/router deployments, Kea DHCP service administration, Netplan interface configuration, Layer 7 Reverse Proxy rules, Secure WebSockets headers, custom local DNS tables, cross-subnet routing logic, and advanced ICMP/HTTP telemetry matrixing.
 * **VPN & Subnet Routing:** Tailscale mesh network integration, FreeBSD system startup hooks (`rc.syshook.d`), base64 shell script execution, and subnet route advertisement across virtualized lab networks.
 * **Offensive Security & Pentesting Labs:** Sandboxed virtual local area networking, vulnerability vectors tracking, target fingerprinting architecture, and security posture auditing.
@@ -142,6 +138,7 @@ Following a critical hardware modernization in June 2026 and an advanced network
 * **August 2026:** Ubuntu Server VM (VM 100) failed to acquire a DHCP lease after spinning up OPNsense (VM 103) on internal bridge `vmbr1`. Resolved by fixing reversed OPNsense virtual interface assignments (`vtnet0` WAN / `vtnet1` LAN), restarting the Kea DHCP daemon via backend shell (`configctl kea restart`), configuring explicit `dhcp4: true` inside Ubuntu's Netplan config (`/etc/netplan/01-netcfg.yaml`), and executing a link-state bounce (`sudo ip link set ens18 down && sudo ip link set ens18 up`) to secure dynamic IP `192.168.1.185` with 0% ping packet loss to `1.1.1.1`.
 * **August 2026:** Experienced GUI access loss and traffic drops on Kali Linux (`VM 101`) connected to the new `OPT1` interface (`vmbr2`). Identified default-deny stateful firewall blocking on unconfigured OPNsense interfaces. Bypassed packet filtering temporarily (`pfctl -d`), added a permanent IPv4 Pass-All rule for the `OPT1` network, tuned Kali XFCE display/screensaver power options to prevent idle lockups, and re-engaged the packet filter (`pfctl -e`) to lock in full outbound NAT and DNS functionality.
 * **August 2026:** Tailscale daemon failed to start automatically across OPNsense VM reboots due to FreeBSD environment quirks. Resolved by creating a startup hook script at `/usr/local/etc/rc.syshook.d/start/99-tailscale`. Overcame `csh` history expansion parsing crashes (`/bin/sh: Event not found`) by piping a base64 encoded string through `b64decode -r`, enabling clean persistent startup of `tailscaled` and route advertisement (`192.168.1.0/24`, `192.168.2.0/24`) without manual shell intervention.
+* **August 2026:** Nginx Proxy Manager throw `Internal Error` when attempting to request Let's Encrypt SSL certificates for local top-level domains (`.lab`). Identified ACME challenge validation failure due to Let's Encrypt servers being unable to reach un-routed private TLDs over the public internet. Resolved by removing SSL cert requests for local non-routable domains, serving them cleanly over standard HTTP (`Port 80`), and routing them via local DNS overrides.
 
 ---
 
@@ -149,30 +146,38 @@ Following a critical hardware modernization in June 2026 and an advanced network
 
 ```text
 [ INTERNET (Boingo Wireless Gateway) ]
-                     |
-            (Wi-Fi Repeater Interface)
-                     |
-          [ GL.iNet Opal Travel Router ]
-           (WISP Gateway / Private Subnet)
-                     |
-              (Ethernet Cable)
-                     |
-       [ BARE-METAL SERVER (OptiPlex 7040) ]
-            (Proxmox VE Hypervisor)
-                     |
+                    |
+           (Wi-Fi Repeater Interface)
+                    |
+         [ GL.iNet Opal Travel Router ]
+          (WISP Gateway / Private Subnet)
+                    |
+             (Ethernet Cable)
+                    |
+      [ BARE-METAL SERVER (OptiPlex 7040) ]
+           (Proxmox VE Hypervisor)
+                    |
        [ TAILSCALE OVERLAY NETWORK ]
        (Secure Mesh Tunnel / Subnet Router)
-                     |
+                    |
         [ OPNsense ROUTER VM 103 ]
         (Gateway / DHCP / Stateful Firewall)
-         /           |           \
-   vtnet0           vtnet1        vtnet2
-  (vmbr0 WAN)     (vmbr1 LAN)   (vmbr2 OPT1)
-  [WAN Subnet]    [LAN Subnet]  [OPT1 Subnet]
-                     |             |
-        ┌────────────┘             └──────────────────────────┐
-        │                                         ┌───────────┴───────────┐
-[ UBUNTU SERVER VM 100 ]                          │                       │
-   (Application Host)                    [ KALI ATTACKER VM 101 ]   [ METASPLOITABLE TARGET VM 102 ]
-      [DHCP Lease]                       (Ethical Hacking Source)      (Vulnerable Target Scope)
-                                               [DHCP Lease]
+        /           |           \
+   vtnet0         vtnet1        vtnet2
+  (vmbr0 WAN)   (vmbr1 LAN)   (vmbr2 OPT1)
+  [WAN Subnet]  [LAN Subnet]  [OPT1 Subnet]
+                    |             |
+        ┌───────────┘             └──────────────────────────┐
+        │                                        ┌───────────┴───────────┐
+[ UBUNTU SERVER VM 100 ]                         │                       │
+   (Application Host)                   [ KALI ATTACKER VM 101 ]   [ METASPLOITABLE TARGET VM 102 ]
+      [DHCP Lease]                      (Ethical Hacking Source)      (Vulnerable Target Scope)
+           │                                   [DHCP Lease]
+  ┌────────┴────────┐
+  │ Docker Stack    │
+  ├─────────────────┤
+  │ NPM Proxy       │
+  │ Homepage        │
+  │ Uptime Kuma     │
+  │ Jellyfin        │
+  └─────────────────┘

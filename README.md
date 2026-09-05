@@ -67,7 +67,7 @@ Following a critical hardware modernization in June 2026 and an advanced network
     * **Headless Server Execution:** Validated full hypervisor outbound internet connectivity via ICMP testing from the Proxmox shell. Confirmed remote reachability to the Proxmox Web GUI over secure Wi-Fi (`https://192.168.8.2:8006`). Disconnected all local monitors, keyboards, and peripheral hardware to lock the OptiPlex into its finalized standalone headless server footprint.
 
 ### Phase 6: Containerization & Modern App Deployment (Docker Platform)
-* **Status:** IN PROGRESS / ACTIVE REDEPLOYMENT (August 2026)
+* **Status:** COMPLETED (September 2026)
 * **Objective:** Deploy production container workloads on Ubuntu Server (VM 100 on subnetwork `192.168.1.185`), establishing reverse proxying, operational dashboards, media streaming, and real-time monitoring.
 * **Implementation Details:**  
   * **Layer 7 Reverse Proxying:** Deployed Nginx Proxy Manager (NPM) in Docker Compose to orchestrate clean inbound HTTP routing rules for local domain aliases (`.lab`).  
@@ -125,6 +125,22 @@ Following a critical hardware modernization in June 2026 and an advanced network
   * **Inverted Destination Rule Isolation Failure:** Experienced full internet outages on Kali Linux (`VM 101`) when using an inverted destination rule (`!OPT1 net`), as the logic dropped all non-OPT1 bound traffic including public WAN IPs (`1.1.1.1`). Resolved by refactoring the rule array into explicit sequential blocks targeting `LAN net` and `192.168.8.0/24`, leaving general outbound WAN traffic open for package updates.
   * **Rule Order & First-Match Overrides:** Fixed a scenario where broad internet pass rules rendered DNS and isolation rules ineffective. Reordered the firewall rule stack to enforce strict top-down processing (Block LAN/Home $\rightarrow$ Allow Gateway DNS $\rightarrow$ Allow WAN).
 
+### Phase 10: Tailscale Serve Integration & Encrypted Overlay Proxying
+* **Status:** COMPLETED (September 2026)
+* **Objective:** Secure application workloads on `ubuntu-apphost` by wrapping unencrypted HTTP container services with automated Let's Encrypt TLS certificates via Tailscale Serve background proxies.
+* **Implementation Details:**
+  * **Allowed Hosts Configuration:** Resolved Homepage security barriers by defining wildcard allowed host environments (`HOMEPAGE_ALLOWED_HOSTS=*`) in `docker-compose.yml` to accept incoming proxied headers over the Tailscale overlay network.
+  * **Tailscale Serve Daemon Proxies:** Executed background TLS termination for application layer ports:
+    * **Homepage Dashboard:** `tailscale serve --bg http://127.0.0.1:3000` (HTTPS Port 443 / Root TLD)
+    * **Jellyfin Media Server:** `tailscale serve --bg --https=8443 http://127.0.0.1:8096`
+    * **Nginx Proxy Manager:** `tailscale serve --bg --https=8181 http://127.0.0.1:81`
+    * **Uptime Kuma Monitoring:** `tailscale serve --bg --https=3001 http://127.0.0.1:3001`
+  * **Homepage Hyperlink Synchronization:** Refactored `services.yaml` redirection URIs (`href`) to align with Tailscale's secure HTTPS overlay ports, while keeping API backend queries (`url`) bound locally to low-latency container IPs.
+* **Technical Challenges Resolved:**
+  * **Docker Compose Array Syntax Error:** Resolved `YAML parsing failed` errors in `docker-compose.yml` caused by specifying environment variables with colon assignment inside quoted lists (`- 'HOMEPAGE_ALLOWED_HOSTS: "*"'`). Corrected to standard key-value list syntax (`- HOMEPAGE_ALLOWED_HOSTS=*`).
+  * **Tailscale CLI Deprecation Syntax:** Handled CLI breaking changes where `tailscale serve --bg https / http://127.0.0.1:3000` threw CLI errors. Re-routed requests using the modern syntax `tailscale serve --bg http://127.0.0.1:3000` to automatically enforce HTTPS/443 termination.
+  * **SSL Handshake & Protocol Misconfigurations (`ERR_SSL_PROTOCOL_ERROR`):** Resolved connection errors resulting from browsers attempting HTTPS connections directly to unencrypted HTTP container ports (`:81`, `:8096`). Resolved by mapping distinct HTTPS ports via Tailscale Serve (`8181`, `8443`) and updating Homepage client redirect links (`href`).
+
 ---
 
 ## Skills Demonstrated
@@ -133,7 +149,7 @@ Following a critical hardware modernization in June 2026 and an advanced network
 * **Linux Administration:** LVM-Thin volume management, raw partition block allocation, system journal maintenance (`journalctl`), and container system pruning.
 * **Containerization & Microservices:** Docker/Docker Compose orchestration, YAML syntax structure, volume persistence mappings, API authentication integration, and isolated runtime logs.
 * **Network Engineering & Gateway Routing:** OSI Model Layers 2-7 manipulation, OPNsense firewall/router deployments, Kea DHCP service administration, Netplan interface configuration, Layer 7 Reverse Proxy rules, Secure WebSockets headers, custom local DNS tables, cross-subnet routing logic, and advanced ICMP/HTTP telemetry matrixing.
-* **VPN & Subnet Routing:** Tailscale mesh network integration, native OPNsense plugin lifecycle management (`os-tailscale`), pre-authenticated API keys, Split DNS query forwarding, and subnet route advertisement across virtualized lab networks.
+* **VPN, Overlay & Mesh Encryption:** Tailscale mesh network integration, native OPNsense plugin lifecycle management (`os-tailscale`), pre-authenticated API keys, Split DNS query forwarding, Tailscale Serve background proxy daemon orchestration, and Let's Encrypt TLS certificate termination without opening inbound WAN ports.
 * **Offensive Security & Pentesting Labs:** Sandboxed virtual local area networking (`OPT1`), vulnerability vectors tracking, target fingerprinting architecture, stateful firewall isolation, and security posture auditing.
 * **Enterprise Migrations (V2V):** Cross-platform virtual machine migrations, SFTP payload management, SSH server-key validation, and hypervisor CLI disk image transcoding.
 
@@ -159,6 +175,9 @@ Following a critical hardware modernization in June 2026 and an advanced network
 * **August 2026:** Tailscale Authentication Failure in OPNsense GUI. Identified node registration failure in Tailscale Admin Console (`opnsense-1` offline) due to truncated key input missing the `tskey-auth-` prefix. Resolved by issuing a new reusable key in Tailscale Admin, updating `VPN -> Tailscale -> Authentication`, enabling `os-tailscale` plugin settings, and approving subnet routes (`192.168.1.0/24`, `192.168.2.0/24`) for persistent remote access.
 * **August 2026:** Outbound Internet Blackhole on Pentesting Subnet (`OPT1`). Identified complete packet drop on external WAN destinations (`1.1.1.1`) caused by an inverted destination rule (`!OPT1 net`) in OPNsense. Resolved by deleting the wildcard inversion and deploying explicit destination block rules targeting `LAN net` (`192.168.1.0/24`) and home gateway (`192.168.8.0/24`), preserving outbound NAT while maintaining 100% internal subnet isolation.
 * **September 2026:** Lost local LAN connectivity and Tailscale WAN access to Proxmox following a router configuration state reset. Root-caused to the GL.iNet Opal travel router defaulting its physical Ethernet jack to WAN mode rather than LAN mode, causing the router firewall to reject local switch traffic from the OptiPlex. Resolved by navigating to `Network -> Ethernet Port` in the GL.iNet admin panel, toggling the port mode from **WAN** to **LAN**, and applying the bridge configuration. Verified restoration via local ICMP reply (`192.168.8.2`) and re-establishment of the Tailscale mesh overlay.
+* **September 2026:** YAML Syntax Parse Error in Homepage Docker Configuration. Identified container crash (`parsing failed`) upon adding `HOMEPAGE_ALLOWED_HOSTS`. Diagnosed incorrect list syntax where key-value pairs were declared with colons inside single quotes (`- 'HOMEPAGE_ALLOWED_HOSTS: "*"'`). Resolved by converting the declaration to standard array assignment (`- HOMEPAGE_ALLOWED_HOSTS=*`), successfully authorizing Homepage proxy headers.
+* **September 2026:** `ERR_SSL_PROTOCOL_ERROR` on Tailscale Application Subdomains. Diagnosed browser protocol mismatches when attempting to force HTTPS directly onto raw, unencrypted HTTP container ports (`:81`, `:8096`). Resolved by configuring Tailscale Serve proxy instances across discrete TLS ports (`8181`, `8443`), and updating Homepage redirect endpoints (`href`) to match the encrypted Tailscale overlay endpoints.
+
 ---
 
 ## Network Topology and Signal/Data Flow
@@ -178,25 +197,26 @@ Following a critical hardware modernization in June 2026 and an advanced network
                     |
        [ TAILSCALE OVERLAY NETWORK ]
   (Split DNS: *.lab -> OPNsense 192.168.1.1)
+  (Tailscale Serve TLS Proxies: :443, :8181, :8443, :3001)
                     |
         [ OPNsense ROUTER VM 103 ]
     (Gateway / Kea DHCP / Unbound DNS / Stateful Firewall)
         /           |           \
-   vtnet0         vtnet1        vtnet2
+   vtnet0         vtnet1         vtnet2
   (vmbr0 WAN)   (vmbr1 LAN)   (vmbr2 OPT1)
   [WAN Subnet]  [LAN Subnet]  [OPT1 Subnet]
                     |             |
         ┌───────────┘             └──────────────────────────┐
-        │                                        ┌───────────┴──────────────────┐
-[ UBUNTU SERVER VM 100 ]                         │                              │
-   (Application Host)                    [ KALI ATTACKER VM 101 ]   [ METASPLOITABLE TARGET VM 102 ]
-[IP: 192.168.1.185 via DHCP]             (Ethical Hacking Source)      (Vulnerable Target Scope)
+        │                                         ┌───────────┴──────────────────┐
+[ UBUNTU SERVER VM 100 ]                          │                              │
+   (Application Host)                     [ KALI ATTACKER VM 101 ]   [ METASPLOITABLE TARGET VM 102 ]
+[IP: 192.168.x.x via DHCP]                (Ethical Hacking Source)      (Vulnerable Target Scope)
         │                                 [IP: 192.168.2.x]             [IP: 192.168.2.x]
-  ┌─────┴───────────┐                          │                                │
-  │ Docker Stack    │                          └─────────────────┬──────────────┘
-  ├─────────────────┤                                            │
-  │ NPM Proxy       │                                  [ FIREWALL ISOLATION ]
-  │ Homepage        │                                 (Blocked from LAN/Home)
-  │ Uptime Kuma     │                                 (Allowed Outbound WAN)
+  ┌─────┴───────────┐                         │                              │
+  │ Docker Stack    │                         └─────────────────┬────────────┘
+  ├─────────────────┤                                           │
+  │ NPM Proxy       │                                 [ FIREWALL ISOLATION ]
+  │ Homepage        │                                (Blocked from LAN/Home)
+  │ Uptime Kuma     │                                (Allowed Outbound WAN)
   │ Jellyfin        │
   └─────────────────┘

@@ -141,6 +141,24 @@ Following a critical hardware modernization in June 2026 and an advanced network
   * **Tailscale CLI Deprecation Syntax:** Handled CLI breaking changes where `tailscale serve --bg https / http://127.0.0.1:3000` threw CLI errors. Re-routed requests using the modern syntax `tailscale serve --bg http://127.0.0.1:3000` to automatically enforce HTTPS/443 termination.
   * **SSL Handshake & Protocol Misconfigurations (`ERR_SSL_PROTOCOL_ERROR`):** Resolved connection errors resulting from browsers attempting HTTPS connections directly to unencrypted HTTP container ports (`:81`, `:8096`). Resolved by mapping distinct HTTPS ports via Tailscale Serve (`8181`, `8443`) and updating Homepage client redirect links (`href`).
 
+### Phase 11: Hardware Gateway Hostname Overrides & Hybrid DNS Resolution
+* **Status:** COMPLETED (September 2026)
+* **Objective:** Establish zero-latency local host DNS overrides directly on the physical GL.iNet SFT1200 travel router using `dnsmasq`/LuCI configuration to map custom `.lab` top-level domains directly to the Tailscale mesh endpoint (`100.86.113.3`).
+* **Implementation Details:**
+  * **Hardware Hostname Overrides:** Configured custom host entries under **GL-SFT1200 Administration $\rightarrow$ Network $\rightarrow$ Hosts** mapping `.lab` aliases directly to the active Tailscale IP address (`100.86.113.3` / `192.168.1.185`):
+    * `homepage.lab` $\rightarrow$ `100.86.113.3`
+    * `jellyfin.lab` $\rightarrow$ `100.86.113.3`
+    * `npm.lab` $\rightarrow$ `100.86.113.3`
+    * `kuma.lab` $\rightarrow$ `100.86.113.3`
+  * **Nginx Proxy Manager Inbound Routing:** Routed inbound requests from local `.lab` aliases through Nginx Proxy Manager to target container ports on the application host:
+    * `homepage.lab` $\rightarrow$ `http://192.168.1.185:3000`
+    * `jellyfin.lab` $\rightarrow$ `http://192.168.1.185:8096`
+    * `npm.lab` $\rightarrow$ `http://192.168.1.185:81`
+    * `kuma.lab` $\rightarrow$ `http://192.168.1.185:3001`
+  * **DNS Verification:** Validated resolution directly via Windows Command Prompt using `nslookup homepage.lab`, confirming immediate local host resolution to `100.86.113.3`.
+* **Technical Challenges Resolved:**
+  * **Local Hostname NXDOMAIN Failures:** Fixed `Non-existent domain` errors in Windows command-line testing when querying custom `.lab` hostnames. Traced to upstream router fallback skipping local virtual DNS tables; resolved by explicitly populating host override records on the GL-SFT1200 router and performing local client `ipconfig /flushdns`.
+
 ---
 
 ## Skills Demonstrated
@@ -177,6 +195,7 @@ Following a critical hardware modernization in June 2026 and an advanced network
 * **September 2026:** Lost local LAN connectivity and Tailscale WAN access to Proxmox following a router configuration state reset. Root-caused to the GL.iNet Opal travel router defaulting its physical Ethernet jack to WAN mode rather than LAN mode, causing the router firewall to reject local switch traffic from the OptiPlex. Resolved by navigating to `Network -> Ethernet Port` in the GL.iNet admin panel, toggling the port mode from **WAN** to **LAN**, and applying the bridge configuration. Verified restoration via local ICMP reply (`192.168.8.2`) and re-establishment of the Tailscale mesh overlay.
 * **September 2026:** YAML Syntax Parse Error in Homepage Docker Configuration. Identified container crash (`parsing failed`) upon adding `HOMEPAGE_ALLOWED_HOSTS`. Diagnosed incorrect list syntax where key-value pairs were declared with colons inside single quotes (`- 'HOMEPAGE_ALLOWED_HOSTS: "*"'`). Resolved by converting the declaration to standard array assignment (`- HOMEPAGE_ALLOWED_HOSTS=*`), successfully authorizing Homepage proxy headers.
 * **September 2026:** `ERR_SSL_PROTOCOL_ERROR` on Tailscale Application Subdomains. Diagnosed browser protocol mismatches when attempting to force HTTPS directly onto raw, unencrypted HTTP container ports (`:81`, `:8096`). Resolved by configuring Tailscale Serve proxy instances across discrete TLS ports (`8181`, `8443`), and updating Homepage redirect endpoints (`href`) to match the encrypted Tailscale overlay endpoints.
+* **September 2026:** Custom `.lab` Domains Unresolvable via Client Machine. Identified `Non-existent domain` (`NXDOMAIN`) errors during Windows `nslookup homepage.lab` testing. Resolved by populating static Host Entry overrides inside the GL-SFT1200 travel router management panel (`homepage.lab` $\rightarrow$ `100.86.113.3`), flushing local Windows DNS cache (`ipconfig /flushdns`), and validating direct DNS query resolution.
 
 ---
 
@@ -188,7 +207,8 @@ Following a critical hardware modernization in June 2026 and an advanced network
            (Wi-Fi Repeater Interface)
                     |
          [ GL.iNet Opal Travel Router ]
-          (WISP Gateway / Private Subnet)
+          (GL-SFT1200 WISP Gateway)
+          (Local Host Overrides: *.lab -> 100.86.x.x)
                     |
               (Ethernet Cable)
                     |
@@ -196,7 +216,7 @@ Following a critical hardware modernization in June 2026 and an advanced network
            (Proxmox VE Hypervisor)
                     |
        [ TAILSCALE OVERLAY NETWORK ]
-  (Split DNS: *.lab -> OPNsense 192.168.1.1)
+  (Tailscale Node / Subnet Router: 100.86.x.x)
   (Tailscale Serve TLS Proxies: :443, :8181, :8443, :3001)
                     |
         [ OPNsense ROUTER VM 103 ]
@@ -207,16 +227,16 @@ Following a critical hardware modernization in June 2026 and an advanced network
   [WAN Subnet]  [LAN Subnet]  [OPT1 Subnet]
                     |             |
         ┌───────────┘             └──────────────────────────┐
-        │                                         ┌───────────┴──────────────────┐
-[ UBUNTU SERVER VM 100 ]                          │                              │
-   (Application Host)                     [ KALI ATTACKER VM 101 ]   [ METASPLOITABLE TARGET VM 102 ]
-[IP: 192.168.x.x via DHCP]                (Ethical Hacking Source)      (Vulnerable Target Scope)
-        │                                 [IP: 192.168.2.x]             [IP: 192.168.2.x]
-  ┌─────┴───────────┐                         │                              │
-  │ Docker Stack    │                         └─────────────────┬────────────┘
-  ├─────────────────┤                                           │
-  │ NPM Proxy       │                                 [ FIREWALL ISOLATION ]
-  │ Homepage        │                                (Blocked from LAN/Home)
-  │ Uptime Kuma     │                                (Allowed Outbound WAN)
-  │ Jellyfin        │
+        │                                        ┌───────────┴──────────────────┐
+[ UBUNTU SERVER VM 100 ]                         │                              │
+   (Application Host)                    [ KALI ATTACKER VM 101 ]   [ METASPLOITABLE TARGET VM 102 ]
+[IP: 192.168.x.x via DHCP]            (Ethical Hacking Source)      (Vulnerable Target Scope)
+        │                                   [IP: 192.168.x.x]             [IP: 192.168.x.x]
+  ┌─────┴───────────┐                            │                              │
+  │ Docker Stack    │                            └─────────────────┬────────────┘
+  ├─────────────────┤                                              │
+  │ NPM Proxy       │ <--- (homepage.lab, jellyfin.lab,            │
+  │ Homepage        │       kuma.lab, npm.lab)            [ FIREWALL ISOLATION ]
+  │ Uptime Kuma     │                                    (Blocked from LAN/Home)
+  │ Jellyfin        │                                    (Allowed Outbound WAN)
   └─────────────────┘

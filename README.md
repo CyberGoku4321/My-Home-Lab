@@ -159,6 +159,15 @@ Following a critical hardware modernization in June 2026 and an advanced network
 * **Technical Challenges Resolved:**
   * **Local Hostname NXDOMAIN Failures:** Fixed `Non-existent domain` errors in Windows command-line testing when querying custom `.lab` hostnames. Traced to upstream router fallback skipping local virtual DNS tables; resolved by explicitly populating host override records on the GL-SFT1200 router and performing local client `ipconfig /flushdns`.
 
+### Phase 12: Private Certificate Authority (mkcert) & Local SSL Strategy
+* **Status:** COMPLETED (September 2026)
+* **Objective:** Deploy a private Certificate Authority using `mkcert` on `ubuntu-apphost` to generate wildcard `.lab` TLS certificates (`*.lab`), load them into Nginx Proxy Manager, and evaluate browser certificate trust mechanisms across internal subnets and Tailscale overlay networks.
+* **Implementation Details:**
+  * **Local CA Initialization:** Installed `mkcert` on `ubuntu-apphost` (`192.168.1.185`) to establish a private local Root CA (`rootCA.pem`) and generated a wildcard SSL certificate pair (`_wildcard.lab+1.pem` and `_wildcard.lab+1-key.pem`).
+  * **Nginx Proxy Manager Integration:** Uploaded the custom wildcard certificate and key into Nginx Proxy Manager under **SSL Certificates $\rightarrow$ Add Custom Certificate**, binding it to all `.lab` proxy hosts (`npm.lab`, `homepage.lab`, `jellyfin.lab`, `kuma.lab`) with **Force SSL** enabled.
+  * **PKI & Browser Trust Evaluation:** Analyzed the Public Key Infrastructure (PKI) model for internal non-routable top-level domains (`.lab`). Verified that while traffic passing through local bridges and Tailscale WireGuard tunnels is 100% encrypted, client web browsers require manual installation of `rootCA.crt` into the system **Trusted Root Certification Authorities** store to eliminate "Not Secure" warnings.
+  * **Architectural Baseline Decision:** Elected to maintain short, clean `.lab` local domain aliases (`npm.lab`, `homepage.lab`) while tolerating the default browser untrusted authority warning on un-managed endpoints, avoiding reliance on public domain registrations, external DNS challenge providers, or third-party DNS infrastructure.
+
 ---
 
 ## Skills Demonstrated
@@ -168,6 +177,7 @@ Following a critical hardware modernization in June 2026 and an advanced network
 * **Containerization & Microservices:** Docker/Docker Compose orchestration, YAML syntax structure, volume persistence mappings, API authentication integration, and isolated runtime logs.
 * **Network Engineering & Gateway Routing:** OSI Model Layers 2-7 manipulation, OPNsense firewall/router deployments, Kea DHCP service administration, Netplan interface configuration, Layer 7 Reverse Proxy rules, Secure WebSockets headers, custom local DNS tables, cross-subnet routing logic, and advanced ICMP/HTTP telemetry matrixing.
 * **VPN, Overlay & Mesh Encryption:** Tailscale mesh network integration, native OPNsense plugin lifecycle management (`os-tailscale`), pre-authenticated API keys, Split DNS query forwarding, Tailscale Serve background proxy daemon orchestration, and Let's Encrypt TLS certificate termination without opening inbound WAN ports.
+* **Public Key Infrastructure (PKI) & Local SSL:** Private Certificate Authority creation using `mkcert`, custom X.509 certificate provisioning, SSL key management in Nginx Proxy Manager, and client-side root certification authority trust store management.
 * **Offensive Security & Pentesting Labs:** Sandboxed virtual local area networking (`OPT1`), vulnerability vectors tracking, target fingerprinting architecture, stateful firewall isolation, and security posture auditing.
 * **Enterprise Migrations (V2V):** Cross-platform virtual machine migrations, SFTP payload management, SSH server-key validation, and hypervisor CLI disk image transcoding.
 
@@ -196,6 +206,7 @@ Following a critical hardware modernization in June 2026 and an advanced network
 * **September 2026:** YAML Syntax Parse Error in Homepage Docker Configuration. Identified container crash (`parsing failed`) upon adding `HOMEPAGE_ALLOWED_HOSTS`. Diagnosed incorrect list syntax where key-value pairs were declared with colons inside single quotes (`- 'HOMEPAGE_ALLOWED_HOSTS: "*"'`). Resolved by converting the declaration to standard array assignment (`- HOMEPAGE_ALLOWED_HOSTS=*`), successfully authorizing Homepage proxy headers.
 * **September 2026:** `ERR_SSL_PROTOCOL_ERROR` on Tailscale Application Subdomains. Diagnosed browser protocol mismatches when attempting to force HTTPS directly onto raw, unencrypted HTTP container ports (`:81`, `:8096`). Resolved by configuring Tailscale Serve proxy instances across discrete TLS ports (`8181`, `8443`), and updating Homepage redirect endpoints (`href`) to match the encrypted Tailscale overlay endpoints.
 * **September 2026:** Custom `.lab` Domains Unresolvable via Client Machine. Identified `Non-existent domain` (`NXDOMAIN`) errors during Windows `nslookup homepage.lab` testing. Resolved by populating static Host Entry overrides inside the GL-SFT1200 travel router management panel (`homepage.lab` $\rightarrow$ `100.86.113.3`), flushing local Windows DNS cache (`ipconfig /flushdns`), and validating direct DNS query resolution.
+* **September 2026:** Browser Untrusted CA Warnings on Custom `.lab` Endpoints. Evaluated private CA wildcard certificate generation using `mkcert` and uploaded custom certificates into Nginx Proxy Manager. Confirmed that while local traffic is encrypted, un-managed devices without imported Root CAs display untrusted warnings. Adopted internal baseline to retain `.lab` hostnames with standard browser prompts over external public domain dependencies.
 
 ---
 

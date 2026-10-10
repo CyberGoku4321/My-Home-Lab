@@ -208,47 +208,46 @@ Following a critical hardware modernization in June 2026 and an advanced network
 * **September 2026:** Custom `.lab` Domains Unresolvable via Client Machine. Identified `Non-existent domain` (`NXDOMAIN`) errors during Windows `nslookup homepage.lab` testing. Resolved by populating static Host Entry overrides inside the GL-SFT1200 travel router management panel (`homepage.lab` $\rightarrow$ `100.86.113.3`), flushing local Windows DNS cache (`ipconfig /flushdns`), and validating direct DNS query resolution.
 * **September 2026:** Browser Untrusted CA Warnings on Custom `.lab` Endpoints. Evaluated private CA wildcard certificate generation using `mkcert` and uploaded custom certificates into Nginx Proxy Manager. Confirmed that while local traffic is encrypted, un-managed devices without imported Root CAs display untrusted warnings. Adopted internal baseline to retain `.lab` hostnames with standard browser prompts over external public domain dependencies.
 * **October 2026:** OPNsense OpenVPN (NordVPN) MVC Migration & Diagnostics. Migrating NordVPN client setup in OPNsense to the updated MVC framework (`VPN -> OpenVPN -> Instances`) to implement policy-based routing. Verified outbound UDP (1194) and TCP (443) network reachability from OPNsense, ruling out Proxmox bridge or ISP firewall drops. Isolated active configuration (`/var/etc/openvpn/instance-258e7fc0-2f70-469d-bf2a-d1777b0959a2.conf`), cleared background daemons (`pkill -9 openvpn`), and monitored live service logs (`/var/log/openvpn/latest.log`). Transitioned from UDP 1194 (which encountered 60-second TLS timeouts) to TCP 443, successfully establishing raw socket layer connectivity (`TCP connection established with [AF_INET]187.40.235.130:443`). Identified ongoing TLS handshake resets (`SIGUSR1[soft,tls-error]`) stemming from a stale pinned remote endpoint IP (`187.40.235.130`). Next steps: update Instance `Remote` settings to dynamic pool hostnames (`us13410.nordvpn.com`), align TLS Static Key (`crypt`) and Auth Digest (`SHA1`) settings, verify full initialization sequence, and complete interface routing assignment.
+* **October 2026:** Configured a NordVPN OpenVPN client on OPNsense (VPN → OpenVPN → Instances) for policy-based routing. Initial attempts failed with TLS negotiation timeouts on UDP 1194 and connection resets on TCP 443. Resolved by loading NordVPN's CA and TLS static key into the instance and aligning auth/cipher settings and service credentials with the provider's config [confirm which of these you actually changed]. Routed a single test VM through the tunnel using a LAN policy rule with the VPN gateway plus a hybrid outbound NAT rule, then verified a changed public IP, an IPv6 leak check, and a kill-switch test with the client stopped.
 
 ---
 
 ## Network Topology and Signal/Data Flow
 
 ```text
-[ INTERNET (Boingo Wireless Gateway) ]
-                    |
-           (Wi-Fi Repeater Interface)
-                    |
-         [ GL.iNet Opal Travel Router ]
-          (GL-SFT1200 WISP Gateway)
-          (Local Host Overrides: *.lab -> 100.86.x.x)
-                    |
-              (Ethernet Cable)
-                    |
-      [ BARE-METAL SERVER (OptiPlex 7040) ]
-           (Proxmox VE Hypervisor)
-                    |
-       [ TAILSCALE OVERLAY NETWORK ]
-  (Tailscale Node / Subnet Router: 100.86.x.x)
-  (Tailscale Serve TLS Proxies: :443, :8181, :8443, :3001)
-                    |
-        [ OPNsense ROUTER VM 103 ]
-    (Gateway / Kea DHCP / Unbound DNS / Stateful Firewall)
-        /           |           \
-   vtnet0         vtnet1         vtnet2
-  (vmbr0 WAN)   (vmbr1 LAN)   (vmbr2 OPT1)
-  [WAN Subnet]  [LAN Subnet]  [OPT1 Subnet]
-                    |             |
-        ┌───────────┘             └──────────────────────────┐
-        │                                        ┌───────────┴──────────────────┐
-[ UBUNTU SERVER VM 100 ]                         │                              │
-   (Application Host)                    [ KALI ATTACKER VM 101 ]   [ METASPLOITABLE TARGET VM 102 ]
-[IP: 192.168.x.x via DHCP]            (Ethical Hacking Source)      (Vulnerable Target Scope)
-        │                                   [IP: 192.168.x.x]             [IP: 192.168.x.x]
-  ┌─────┴───────────┐                            │                              │
-  │ Docker Stack    │                            └─────────────────┬────────────┘
-  ├─────────────────┤                                              │
-  │ NPM Proxy       │ <--- (homepage.lab, jellyfin.lab,            │
-  │ Homepage        │       kuma.lab, npm.lab)            [ FIREWALL ISOLATION ]
-  │ Uptime Kuma     │                                    (Blocked from LAN/Home)
-  │ Jellyfin        │                                    (Allowed Outbound WAN)
-  └─────────────────┘
+                [ INTERNET (Boingo Wireless Gateway) ]
+                                 |
+                     (Wi-Fi Repeater Interface)
+                                 |
+                   [ GL.iNet Opal Travel Router ]
+                   (GL-SFT1200 / WISP Repeater Mode)
+              (Local DNS Overrides: *.lab -> 100.86.x.x)
+                                 |
+                          (Ethernet Cable)
+                                 |
+                 [ BARE-METAL SERVER (OptiPlex 7040) ] - - - - [ TAILSCALE MESH ]
+                    (Proxmox VE Hypervisor / vmbr0)             (Out-of-band remote access)
+                                 |                              (Proxmox Host = Subnet Router)
+                                 | vtnet0 (WAN)                 (VM 100 = Tailnet Node: 100.86.x.x)
+                                 |                              (Serve TLS Proxies: :443, :8181,
+                                 |                               :8443, :3001)
+                    [ OPNsense ROUTER VM 103 ] - - - - - - - [ NordVPN OpenVPN Client ]
+      (Gateway / Kea DHCP / Unbound DNS / Stateful Firewall)   (ovpnc1 / NordVPN_WAN)
+                                 |                             (Policy-Routed: VM 100 only)
+                  ┌──────────────┴──────────────┐
+            vtnet1 (LAN)                   vtnet2 (OPT1)
+               vmbr1                          vmbr2
+                  │                              │
+        [ UBUNTU SERVER VM 100 ]      ┌──────────┴─────────────┐
+         (Application Host)           │                        │
+       [IP: 192.168.1.x via DHCP] [ KALI ATTACKER VM 101 ] [ METASPLOITABLE TARGET VM 102 ]
+                  │               (Ethical Hacking Source) (Vulnerable Target Scope)
+        ┌─────────┴───────┐       [IP: 192.168.x.x]        [IP: 192.168.x.x]
+        │ Docker Stack    │                │                        │
+        ├─────────────────┤                └───────────┬────────────┘
+        │ NPM Proxy       │ <-- (homepage.lab,         │
+        │ Homepage        │      jellyfin.lab,   [ FIREWALL ISOLATION ]
+        │ Uptime Kuma     │      kuma.lab,       (Blocked from LAN/Home)
+        │ Jellyfin        │      npm.lab)        (Allowed Outbound WAN)
+        └─────────────────┘
+```

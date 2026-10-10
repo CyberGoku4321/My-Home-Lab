@@ -27,6 +27,14 @@ Following a critical hardware modernization in June 2026 and an advanced network
 
 ---
 
+## Project Roadmap & Implementation Checklist
+
+- [x] **Phase 1-6: Proxmox VE & OPNsense Foundation:** Proxmox VE 8.4 deployment, OPNsense VM 103 configuration, interface mapping (`vmbr0` WAN, `vmbr1` LAN, `vmbr2` OPT1), and Tailscale remote management.
+- [x] **Phase 7: Mesh VPN & Remote Access:** Deployed Tailscale mesh daemon on Proxmox host and configured Tailscale Serve proxy integration for secure Web GUI access.
+- [x] **Phase 8: NordVPN OpenVPN Client & Policy Routing:** Configured NordVPN client via OPNsense MVC framework (`VPN -> OpenVPN -> Instances`) using TCP/443 with policy-based routing on `ovpnc1` (`NORDVPN_WAN_VPNV4`) and Hybrid Outbound NAT.
+- [x] **Phase 9: Ubuntu Server VM 100 Hardening:** Pinned static IP (`192.168.1.185`) and NordVPN DNS resolvers (`103.86.96.100` / `103.86.99.100`) via Netplan, with verified leak protection and functional kill-switch.
+- [ ] **Phase 10: Proxmox Host Firewall Hardening:** Pending re-enabling Datacenter firewall after explicitly scoping inbound Accept rules for SSH (port 22) and Web GUI (port 8006) to the Tailscale range (`100.64.0.0/10`).
+
 ## Active Infrastructure Phases
 
 ### Phase 1: Linux & Hypervisor Fundamentals (Legacy Baseline)
@@ -77,21 +85,21 @@ Following a critical hardware modernization in June 2026 and an advanced network
   * **NPM Internal Error on Local Domain SSL Generation:** Encountered Let's Encrypt verification failures (`Internal Error`) when requesting SSL certificates for internal `.lab` top-level domains. Diagnosed as an ACME HTTP-01 challenge failure due to Let's Encrypt public servers being unable to resolve private, non-routable `.lab` addresses. Resolved by reverting local host proxies to standard HTTP (`Port 80`), reserving ACME validation exclusively for public domain endpoints or DNS-01 challenges.
 
 ### Phase 7: Reverse Proxying, WireGuard/Tailscale Mesh VPN & Remote Access
-* **Status:** COMPLETED (July 2026)
-* **Objective:** Establish secure, encrypted outbound overlay networks using Tailscale to tunnel into the barracks lab environment from external networks or cellular data without opening insecure firewall vectors.
-* **Historical Benchmarks Achieved:**  
-  * **Air-Gapped Infrastructure Routing:** Provisioned a standalone Linux Bridge (`vmbr1`) inside Proxmox *without physical NIC binding* to orchestrate an air-gapped virtual switch isolated entirely within server RAM.  
+- **Status:** COMPLETED (July 2026)
+- **Objective:** Establish secure, encrypted outbound overlay networks using Tailscale to tunnel into the barracks lab environment from external networks or cellular data without opening insecure firewall vectors.
+- **Historical Benchmarks Achieved:**  
+  * **Network Bridge Orchestration:** Configured Proxmox Linux bridges separating traffic domains: `vmbr0` (WAN / upstream), `vmbr1` (LAN bridge routed through OPNsense VM 103 for local services and VM 100), and `vmbr2` (OPT1 bridge dedicated to isolated pentesting lab segments).  
   * **Offline Attacker Deployment:** Deployed a Kali Linux VM using a full 4.7 GB offline installer image, safely bypassing external gateway dependencies during network configuration.  
   * **Enterprise V2V Migration (VMware to Proxmox):** Managed a cross-platform migration of an intentionally vulnerable enterprise target (**Metasploitable2**). Leveraged Secure File Transfer Protocol (SFTP) via WinSCP to push legacy VMware disk arrays directly to Proxmox server filesystems.  
   * **CLI Disk Conversion Orchestration:** Executed low-level hypervisor management via the Proxmox CLI (`qm importdisk`) to dynamically transcode a `.vmdk` disk volume into a high-performance, bare-metal native block-level `raw` storage architecture mapped to LVM-Thin storage.  
   * **Secure Mesh Networking:** Deployed Tailscale daemon directly on the Proxmox bare-metal host to create a private, encrypted mesh network.  
-  * **Tailscale Serve Orchestration:** Configured tailscale serve as a lightweight proxy to map internal services to the Tailscale mesh, executing `tailscale serve --bg https+insecure://localhost:8006` to bridge the Proxmox Web GUI to a dedicated Tailscale MagicDNS domain.
-* **Technical Challenges Resolved:**  
+  * **Tailscale Serve Orchestration:** Configured Tailscale Serve as a lightweight proxy to map internal services to the Tailscale mesh, executing `tailscale serve --bg https+insecure://localhost:8006` to bridge the Proxmox Web GUI to a dedicated Tailscale MagicDNS domain.
+- **Technical Challenges Resolved:**  
   * **Boot Order and Installer Loops:** Fixed an installation loop where Kali Linux kept booting into the live installation ISO post-reboot. Resolved by unmounting the virtual media device and re-indexing the SeaBIOS device boot order priorities.  
-  * **Linux Directory & Literal File Parsing Errors:** Troubleshooted file execution boundaries within the Linux terminal where literal character omissions threw non-existent file exceptions during storage attachments. Corrected volume maps dynamically via command-line flags.  
-  * **VPN/Tunnel Routing Conflicts:** Resolved ERR_TUNNEL_CONNECTION_FAILED errors on the host workstation by adding the Tailscale MagicDNS domain (`https://proxmox.tail4754ec.ts.net/`) as an explicit split-tunneling exclusion within the NordVPN client settings.
-  * **Command-Line Authority:** Mitigated `sudo: command not found` errors by leveraging the root-level shell access inherent to the Proxmox node for direct Tailscale service management.
-  * **Latency Mitigation:** Diagnosed connectivity timeouts caused by weak cellular signal (1-bar) and confirmed that the underlying tailscale serve proxy architecture is fully operational once the signal threshold is stabilized.
+  * **Linux Directory & Literal File Parsing Errors:** Troubleshot file execution boundaries within the Linux terminal where literal character omissions threw non-existent file exceptions during storage attachments. Corrected volume maps dynamically via command-line flags.  
+  * **VPN/Tunnel Routing Conflicts:** Resolved connection errors on the host workstation by adding the Tailscale MagicDNS domain as an explicit split-tunneling exclusion within the VPN client settings.
+  * **Command-Line Authority:** Mitigated `sudo: command not found` errors by leveraging root-level shell access inherent to the Proxmox node for direct Tailscale service management.
+  * **Latency Mitigation:** Diagnosed connectivity timeouts caused by weak cellular signals and confirmed that the underlying Tailscale serve proxy architecture is fully operational once the signal threshold is stabilized.
 
 ### Phase 8: Virtualized Security Gateway, DHCP Engineering & Native Tailscale Plugin Integration (OPNsense Modernization)
 * **Status:** COMPLETED (August 2026)
@@ -209,6 +217,7 @@ Following a critical hardware modernization in June 2026 and an advanced network
 * **September 2026:** Browser Untrusted CA Warnings on Custom `.lab` Endpoints. Evaluated private CA wildcard certificate generation using `mkcert` and uploaded custom certificates into Nginx Proxy Manager. Confirmed that while local traffic is encrypted, un-managed devices without imported Root CAs display untrusted warnings. Adopted internal baseline to retain `.lab` hostnames with standard browser prompts over external public domain dependencies.
 * **October 2026:** OPNsense OpenVPN (NordVPN) MVC Migration & Diagnostics. Migrating NordVPN client setup in OPNsense to the updated MVC framework (`VPN -> OpenVPN -> Instances`) to implement policy-based routing. Verified outbound UDP (1194) and TCP (443) network reachability from OPNsense, ruling out Proxmox bridge or ISP firewall drops. Isolated active configuration (`/var/etc/openvpn/instance-258e7fc0-2f70-469d-bf2a-d1777b0959a2.conf`), cleared background daemons (`pkill -9 openvpn`), and monitored live service logs (`/var/log/openvpn/latest.log`). Transitioned from UDP 1194 (which encountered 60-second TLS timeouts) to TCP 443, successfully establishing raw socket layer connectivity (`TCP connection established with [AF_INET]187.40.235.130:443`). Identified ongoing TLS handshake resets (`SIGUSR1[soft,tls-error]`) stemming from a stale pinned remote endpoint IP (`187.40.235.130`). Next steps: update Instance `Remote` settings to dynamic pool hostnames (`us13410.nordvpn.com`), align TLS Static Key (`crypt`) and Auth Digest (`SHA1`) settings, verify full initialization sequence, and complete interface routing assignment.
 * **October 2026:** Configured a NordVPN OpenVPN client on OPNsense (VPN → OpenVPN → Instances) for policy-based routing. Initial attempts failed with TLS negotiation timeouts on UDP 1194 and connection resets on TCP 443. Resolved by loading NordVPN's CA and TLS static key into the instance and aligning auth/cipher settings and service credentials with the provider's config [confirm which of these you actually changed]. Routed a single test VM through the tunnel using a LAN policy rule with the VPN gateway plus a hybrid outbound NAT rule, then verified a changed public IP, an IPv6 leak check, and a kill-switch test with the client stopped.
+* **October 2026:** OPNsense NordVPN MVC Instance & Policy-Based Routing Setup. Successfully migrated NordVPN client to OPNsense MVC framework (`VPN -> OpenVPN -> Instances`) using TCP/443. Configured policy-based routing on `ovpnc1` (`NORDVPN_WAN_VPNV4`) with a manual Hybrid Outbound NAT rule exclusively targeting Ubuntu Server VM 100 (`192.168.1.185`). Resolved Netplan permissions (`chmod 600`) and assigned static NordVPN resolvers (`103.86.96.100` / `103.86.99.100`). Verified public exit IP (`187.40.235.131`), blocked IPv6 traffic, and validated functional kill-switch behavior upon client shutdown.
 
 ---
 

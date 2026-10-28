@@ -34,6 +34,7 @@ After a critical hardware modernization in June 2026 and an advanced network re-
 - [x] **Phase 8: NordVPN OpenVPN Client & Policy Routing:** Configured NordVPN client via OPNsense MVC framework (`VPN -> OpenVPN -> Instances`) using TCP/443 with policy-based routing on `ovpnc1` (`NORDVPN_WAN_VPNV4`) and Hybrid Outbound NAT.
 - [x] **Phase 9: Ubuntu Server VM 100 Hardening:** Pinned static IP (`192.168.1.185`) and NordVPN DNS resolvers (`103.86.96.100` / `103.86.99.100`) via Netplan, with verified leak protection and functional kill-switch.
 - [ ] **Phase 10: Proxmox Host Firewall Hardening:** Pending re-enabling the Datacenter firewall after explicitly scoping inbound Accept rules for SSH (port 22) and Web GUI (port 8006) to the Tailscale range (`100.64.0.0/10`).
+- [x] **Phase 13: Isolated Minecraft Segment:** Moved the Minecraft Bedrock server (VM 104) onto its own Proxmox bridge (`vmbr3`) and OPNsense interface (MinecraftBridge, `172.16.30.0/24`) with its own firewall rules, plus Tailscale subnet routing for admin access.
 
 
 ## Active Infrastructure Phases
@@ -177,6 +178,23 @@ After a critical hardware modernization in June 2026 and an advanced network re-
   * **PKI & Browser Trust Evaluation:** Analyzed the Public Key Infrastructure (PKI) model for internal non-routable top-level domains (`.lab`). Verified that while traffic passing through local bridges and Tailscale WireGuard tunnels is 100% encrypted, client web browsers require manual installation of `rootCA.crt` into the system **Trusted Root Certification Authorities** store to eliminate "Not Secure" warnings.
   * **Architectural Baseline Decision:** Elected to maintain short, clean `.lab` local domain aliases (`npm.lab`, `homepage.lab`) while tolerating the default browser untrusted authority warning on unmanaged endpoints, avoiding reliance on public domain registrations, external DNS challenge providers, or third-party DNS infrastructure.
 
+### Phase 13: Isolated Minecraft Server Segment (vmbr3, OPNsense Interface & Firewall Rules)
+* **Status:** COMPLETED (October 2026)
+* **Objective:** Give the Minecraft Bedrock server (VM 104) a network of its own, separate from the main LAN and from the Kali/Metasploitable segment, so it can reach the internet but is blocked from the private ranges in my lab. Players join through an outbound tunnel, so I did not open any inbound ports on OPNsense for it.
+* **Implementation Details:**
+  * **New bridge:** Created `vmbr3` in Proxmox as an internal-only Linux bridge (no physical port, no IP on the host). VM 104 is the only guest on it, and I'm keeping it that way, because two VMs on the same bridge talk to each other directly and never pass through the firewall rules.
+  * **OPNsense interface:** Added a fourth VirtIO NIC to OPNsense VM 103 on `vmbr3` (`vtnet3`), assigned it as `opt3` with the description `MinecraftBridge`, and gave it a static `172.16.30.1/24`. I picked that subnet so it would not overlap `192.168.1.0/24`, `192.168.2.0/24`, `192.168.8.0/24`, the NordVPN range, Tailscale's `100.64.0.0/10`, or the Docker ranges inside VM 104 (`172.17.0.0/16`, `172.18.0.0/16`). There is no DHCP on this interface.
+  * **VM 104 addressing:** Static 172.16.30.10/24 in Netplan, with 172.16.30.1 as both the gateway and the DNS server.
+  * **Firewall rules (MinecraftBridge, top to bottom):**
+    * **Rule 1 (Allow Gateway DNS):** `Pass` | TCP/UDP | Source: `MinecraftBridge net` | Destination: `MinecraftBridge address` | Port: `53 (DNS)`
+    * **Rule 2 (Block Private Ranges):** `Block` | Source: `MinecraftBridge net` | Destination: `PRIVATE_NETS` (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10`)
+    * **Rule 3 (Allow Outbound Internet):** `Pass` | Source: `MinecraftBridge net` | Destination: `*`
+  * **Outbound NAT:** OPNsense was already in Hybrid mode, and the automatic WAN rule included the new network, so no manual NAT rule was needed.
+  * **Player access:** A Playit tunnel agent on VM 104 makes an outbound connection, and a Cloudflare subdomain (`DNS-only CNAME`) points at the tunnel. The server's allow list is turned on.
+  * **Admin access:** Crafty Controller (web UI on `port 8443`) and SSH on VM 104 are reached through the OPNsense Tailscale subnet router. I added `172.16.30.0/24` to its advertised routes and approved it in the Tailscale admin console.
+  * **Server update and backups:** Updated the Bedrock server to 1.26.60 with Crafty's Update Center, confirmed the world folder still matched `level-name` in `server.properties`, set up a weekly scheduled backup in Crafty, and took Proxmox snapshots of VM 104 around the changes.
+  * **Verification:** From VM 104, DNS resolved through `172.16.30.1`, a ping to a public IP worked, and pings to the LAN (`192.168.1.1`) and OPT1 (`192.168.2.1`) gateways timed out (ICMP tests only so far). A Minecraft client on my PC joined using the public name.
+
 
 ---
 
@@ -190,6 +208,11 @@ After a critical hardware modernization in June 2026 and an advanced network re-
 * **Public Key Infrastructure (PKI) & Local SSL:** Private Certificate Authority creation using `mkcert`, custom X.509 certificate provisioning, SSL key management in Nginx Proxy Manager, and client-side root certificate authority trust store management.
 * **Offensive Security & Pentesting Labs:** Sandboxed virtual local area networking (`OPT1`), vulnerability vector tracking, target fingerprinting architecture, stateful firewall isolation, and security posture auditing.
 * **Enterprise Migrations (V2V):** Cross-platform virtual machine migrations, SFTP payload management, SSH server-key validation, and hypervisor CLI disk image transcoding.
+* **Network Segmentation & Firewall Policy:** A dedicated Linux bridge and OPNsense interface per workload, ordered stateful rules (DNS pass, private-range block, internet allow), alias-based rules, and outbound NAT review.
+* **Packet-Level Troubleshooting:** ARP/neighbor checks, OPNsense packet capture and firewall Live View, traceroute path analysis, and `ss`/`curl` service checks.
+* **DNS Engineering:** Unbound recursive resolving versus forwarding, and DNS over TLS to Cloudflare.
+* **Tailscale Subnet Routing & Recovery:** Advertising and approving subnet routes, and recovering a logged-out subnet router through an out-of-band console.
+* **Game Server Operations:** Crafty Controller, Bedrock server updates, scheduled backups, VM snapshots, and a Playit tunnel with no inbound port forwarding.
 
 ---
 
@@ -220,9 +243,13 @@ After a critical hardware modernization in June 2026 and an advanced network re-
 * **October 2026:** Configured a NordVPN OpenVPN client on OPNsense (VPN → OpenVPN → Instances) to route a single VM through the VPN using policy-based routing. The first attempts failed with TLS negotiation timeouts on UDP 1194 and connection resets on TCP 443; switching to TCP did not help. The tunnel connected once the instance had the provider's CA with certificate verification, the provider's TLS static key in authenticate mode, the matching SHA512 auth digest, an AES-256-CBC cipher fallback, a server hostname instead of a pinned IP, and the NordVPN service credentials. Several settings changed together, so I could not isolate a single cause; the missing TLS key is the likely one because it matches both failure patterns. I set "Don't pull routes" so the tunnel would not take over the default route, then added a LAN firewall rule that sends one VM's outbound traffic (destination inverted to the LAN network) through the VPN gateway, plus a hybrid outbound NAT rule on the VPN interface. The first test timed out because the NAT rule matched the wrong source network; correcting it to the LAN network fixed it. I verified that the VM's public IP changed to the VPN exit, that an IPv6 test could not connect (no leak), and that stopping the VPN client blocked the VM's traffic.
 * **October 2026:** The following Troubleshooting actions were taken:
   * OPNsense 26.7 Major Upgrade & Tailscale Service Recovery. Successfully upgraded OPNsense VM 103 from version 26.1 to 26.7 via web GUI firmware update. Restored web management and Tailscale connectivity following a post-upgrade daemon drop by accessing the Proxmox VM console shell (option `8`), restarting the daemon via `service tailscaled restart`, and re-announcing subnet routes using `tailscale up --advertise-routes=192.168.1.0/24,192.168.2.0/24`.
-  * Proxmox Datacenter & Host Firewall Hardening. Hardened hypervisor host access by configuring explicit inbound **ACCEPT** rules for SSH (`Port 22`) and Proxmox Web GUI (`Port 8006`) targeting Tailscale overlay range (`100.64.0.0/10`) and local LAN subnet (`192.168.1.0/24`). Toggled global Datacenter Firewall to **Enabled** and verified SSH/Web GUI management persistence without lockout.
   * Homepage Proxmox Widget API Error (`Unexpected token '<'`). Diagnosed Proxmox host widget API failure (`Unexpected token '<', "<html..." is not valid JSON`) returning raw HTML login pages. Root cause: widget URL referencing stale legacy gateway IP (`192.168.8.2:8006`). Resolved by updating `services.yaml` configuration to point widget URL directly to active Tailscale IP (`https://100.105.172.66:8006`), restarting the container (`docker restart homepage`), and restoring live hypervisor metrics.
   * Uptime Kuma Proxmox Host Monitoring Timeout. Resolved persistent `Down` alert (48000ms timeout) for Proxmox Host monitor in Uptime Kuma. Root cause: DNS resolution failure on VM 100 for Tailscale MagicDNS due to strict NordVPN DNS resolvers. Resolved by updating the monitor target URL to point to the Tailscale IP (`https://100.105.172.66:8006/`), enabling **Ignore TLS/SSL errors** for self-signed certificates, and validating status recovery (HTTP 200 OK) via Ntfy alerts.
+* **October 2026:** SSH to VM 104 failed with a connection timeout and then a `"REMOTE HOST IDENTIFICATION HAS CHANGED"` warning after I moved it to a new network. The VM had lost its old `192.168.1.x` address when its NIC changed bridges, and I had also typed that old address (as a `/32`) onto the new OPNsense interface by mistake, so OPNsense itself answered at that address with its own SSH key. I confirmed the fingerprint matched OPNsense's, changed the interface to its own `172.16.30.1/24`, cleared the stale entry with `ssh-keygen -R`, and gave VM 104 a static `172.16.30.10` in Netplan.
+* **October 2026:** VM 104 had no DNS or internet right after the move, even though the firewall rules looked correct. ARP showed the VM could reach OPNsense, so the bridges were fine, and a packet capture on `vtnet3` showed DNS queries and pings arriving with no replies leaving. After I turned on logging for the two pass rules and applied again, traffic passed and the Live View showed the rules matching. I never pinned down a single cause; my best guess is that the rules were not fully loaded until the second apply. Pinging the gateway itself fails by design here, because the block rule covers it, so DNS lookups and a ping to a public IP are the right tests.
+* **October 2026:** Unbound answered every lookup with `SERVFAIL`, on the new segment and on OPNsense itself, while queries sent straight to `1.1.1.1` worked. Unbound had no forwarders configured, so it was resolving recursively on its own, which did not work on this network. I pointed it at Cloudflare (`1.1.1.1` and `1.0.0.1`) on `port 53` and then switched it to DNS over TLS on `port 853`.
+* **October 2026:** Crafty and SSH on VM 104 timed out from my PC even though the server was fine (`ss` showed Crafty listening on 8443 and `curl` from inside the VM got a response). A `tracert` showed my traffic leaving through my normal internet gateway instead of the Tailscale tunnel, because the subnet routes OPNsense advertised did not include `172.16.30.0/24`. I added it to the OPNsense Tailscale plugin's Advertised Routes and approved it in the admin console. Right after saving, OPNsense's Tailscale node logged out (`tailscale status` showed "Logged out"), which also cut off my route to the OPNsense web GUI, because OPNsense is the node that provides that route. I got back in through the Proxmox console for VM 103, logged the node back in (it re-registered as `opnsense-1`), and confirmed all three routes were approved. I also set up an SSH tunnel through VM 100 as a backup path to the OPNsense GUI. The Proxmox console, which has its own Tailscale address, is the fallback when OPNsense's Tailscale goes down.
+* **October 2026:** The Minecraft client showed "The host you are trying to join is using an older version" when I tried to join. That told me the whole path (DNS, tunnel, server) worked and the server software was just behind the game. I updated the Bedrock server to 1.26.60 through Crafty's Update Center, checked that the world folder still matched `level-name` in `server.properties`, ran a backup, and joined successfully.
 
 
 ---
@@ -231,39 +258,45 @@ After a critical hardware modernization in June 2026 and an advanced network re-
 ## Network Topology and Signal/Data Flow
 
 ```text
-                [ INTERNET (Boingo Wireless Gateway) ]
-                                 |
-                     (Wi-Fi Repeater Interface)
-                                 |
-                   [ GL.iNet Opal Travel Router ]
-                   (GL-SFT1200 / WISP Repeater Mode)
-              (Local DNS Overrides: *.lab -> 100.86.x.x)
-                                 |
-                          (Ethernet Cable)
-                                 |
-                 [ BARE-METAL SERVER (OptiPlex 7040) ] - - - - [ TAILSCALE MESH ]
-                    (Proxmox VE Hypervisor / vmbr0)             (Out-of-band remote access)
-                                 |                              (Proxmox Host = Subnet Router)
-                                 | vtnet0 (WAN)                 (VM 100 = Tailnet Node: 100.86.x.x)
-                                 |                              (Serve TLS Proxies: :443, :8181,
-                                 |                               :8443, :3001)
-                    [ OPNsense ROUTER VM 103 ] - - - - - - - [ NordVPN OpenVPN Client ]
-      (Gateway / Kea DHCP / Unbound DNS / Stateful Firewall)   (ovpnc1 / NordVPN_WAN)
-                                 |                             (Policy-Routed: VM 100 only)
-                  ┌──────────────┴──────────────┐
-            vtnet1 (LAN)                   vtnet2 (OPT1)
-               vmbr1                          vmbr2
-                  │                              │
-        [ UBUNTU SERVER VM 100 ]      ┌──────────┴─────────────┐
-         (Application Host)           │                        │
-       [IP: 192.168.1.x via DHCP] [ KALI ATTACKER VM 101 ] [ METASPLOITABLE TARGET VM 102 ]
-                  │               (Ethical Hacking Source) (Vulnerable Target Scope)
-        ┌─────────┴───────┐       [IP: 192.168.x.x]        [IP: 192.168.x.x]
-        │ Docker Stack    │                │                        │
-        ├─────────────────┤                └───────────┬────────────┘
-        │ NPM Proxy       │ <-- (homepage.lab,         │
-        │ Homepage        │      jellyfin.lab,   [ FIREWALL ISOLATION ]
-        │ Uptime Kuma     │      kuma.lab,       (Blocked from LAN/Home)
-        │ Jellyfin        │      npm.lab)        (Allowed Outbound WAN)
-        └─────────────────┘
-```
+                    [ INTERNET (Boingo Wireless Gateway) ]
+                                     |
+                          (Wi-Fi Repeater Interface)
+                                     |
+                        [ GL.iNet Opal Travel Router ]
+                        (GL-SFT1200 / WISP Repeater Mode)
+                     (Local DNS Overrides: *.lab -> 100.86.x.x)
+                                     |
+                              (Ethernet Cable)
+                                     |
+                     [ BARE-METAL SERVER (OptiPlex 7040) ] - - - - [ TAILSCALE MESH ]
+                        (Proxmox VE Hypervisor / vmbr0)            (Out-of-band remote access)
+                                     |                             (Proxmox Host = Subnet Router)
+                                     | vtnet0 (WAN)                (VM 100 = Tailnet Node: 100.86.x.x)
+                                     |                             (Serve TLS Proxies: :443, :8181,
+                                     |                              :8443, :3001)
+                        [ OPNsense ROUTER VM 103 ] - - - - - - - [ NordVPN OpenVPN Client ]
+              (Gateway / Kea DHCP / Unbound DNS / Stateful Firewall)   (ovpnc1 / NordVPN_WAN)
+                                     |                             (Policy-Routed: VM 100 only)
+                                     |
+                  ┌──────────────────┼──────────────────────────────┐
+             vtnet1 (LAN)       vtnet2 (OPT1)                  vtnet3 (OPT3)
+                vmbr1             vmbr2                     (MinecraftBridge)
+                  │                 │                       172.16.30.1/24
+                                    │                       vmbr3 (Internal only)
+        [ UBUNTU SERVER VM 100 ]    │                               │
+         (Application Host)         │                               ▼
+        [IP: 192.168.1.x via DHCP]  │                  [ VM 104 minecraft-server ]
+                  │                 │                      (IP: 172.16.30.10)
+        ┌─────────┴───────┐         ▼                      - Crafty (Docker)
+        │ Docker Stack    │   ┌─────┴────────────────┐     - Bedrock server
+        ├─────────────────┤   │                      │     - Playit agent (outbound)
+        │ NPM Proxy       │   ▼                      ▼     - Rules: DNS -> gateway,
+        │ Homepage        │ [ KALI ATTACKER VM ] [ METASPLOITABLE ]   block private ranges,
+        │ Uptime Kuma     │ (Ethical Hacking Src)(Vulnerable Target)  allow internet
+        │ Jellyfin        │ [IP: 192.168.x.x]    [IP: 192.168.x.x]
+        └─────────────────┘          │               │
+                                     └───────┬───────┘
+                                             │
+                                   [ FIREWALL ISOLATION ]
+                                   (Blocked from LAN/Home)
+                                   (Allowed Outbound WAN)

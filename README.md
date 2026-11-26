@@ -34,8 +34,8 @@ After a critical hardware modernization in June 2026 and an advanced network re-
 - [x] **Phase 8: NordVPN OpenVPN Client & Policy Routing:** Configured NordVPN client via OPNsense MVC framework (`VPN -> OpenVPN -> Instances`) using TCP/443 with policy-based routing on `ovpnc1` (`NORDVPN_WAN_VPNV4`) and Hybrid Outbound NAT.
 - [x] **Phase 9: Ubuntu Server VM 100 Hardening:** Pinned static IP (`192.168.1.185`) and NordVPN DNS resolvers (`103.86.96.100` / `103.86.99.100`) via Netplan, with verified leak protection and functional kill-switch.
 - [ ] **Phase 10: Proxmox Host Firewall Hardening:** Pending re-enabling the Datacenter firewall after explicitly scoping inbound Accept rules for SSH (port 22) and Web GUI (port 8006) to the Tailscale range (`100.64.0.0/10`).
-- [x] **Phase 13: Isolated Minecraft Segment:** Moved the Minecraft Bedrock server (VM 104) onto its own Proxmox bridge (`vmbr3`) and OPNsense interface (MinecraftBridge, `172.16.30.0/24`) with its own firewall rules, plus Tailscale subnet routing for admin access.
-
+- [x] **Phase 13: Isolated Minecraft Segment:** Moved the Minecraft Bedrock server (VM 104) onto its own Proxmox bridge (`vmbr3`) and OPNsense interface (`MinecraftBridge`, `172.16.30.0/24`) with stateful firewall rules and Tailscale subnet routing for admin access.
+- [ ] **Phase 14 (In Progress):** External Bedrock Tunnel Audit & AI Homelab Administrator ($0-First Roadmap): Verify Playit tunnel routing (`RakNet` vs. `NetherNet`) for public hostname access, followed by deploying a read-only AI operations assistant (LibreChat, LiteLLM, MCP, and RAG documentation indexing).
 
 ## Active Infrastructure Phases
 
@@ -178,23 +178,31 @@ After a critical hardware modernization in June 2026 and an advanced network re-
   * **PKI & Browser Trust Evaluation:** Analyzed the Public Key Infrastructure (PKI) model for internal non-routable top-level domains (`.lab`). Verified that while traffic passing through local bridges and Tailscale WireGuard tunnels is 100% encrypted, client web browsers require manual installation of `rootCA.crt` into the system **Trusted Root Certification Authorities** store to eliminate "Not Secure" warnings.
   * **Architectural Baseline Decision:** Elected to maintain short, clean `.lab` local domain aliases (`npm.lab`, `homepage.lab`) while tolerating the default browser untrusted authority warning on unmanaged endpoints, avoiding reliance on public domain registrations, external DNS challenge providers, or third-party DNS infrastructure.
 
-### Phase 13: Isolated Minecraft Server Segment (vmbr3, OPNsense Interface & Firewall Rules)
-* **Status:** COMPLETED (October 2026)
-* **Objective:** Give the Minecraft Bedrock server (VM 104) a network of its own, separate from the main LAN and from the Kali/Metasploitable segment, so it can reach the internet but is blocked from the private ranges in my lab. Players join through an outbound tunnel, so I did not open any inbound ports on OPNsense for it.
+### Phase 13: Isolated Minecraft Server Segment (`vmbr3`, OPNsense Interface & Firewall Rules)
+* **Network Segment Status:** COMPLETED (October 2026) — Isolated bridge (`vmbr3`), OPNsense interface (`172.16.30.1/24`), stateful firewall rules, and Tailscale subnet routing are verified and active.
+* **Service Status (November 2026):** **Down (Under Investigation)** — The Minecraft Bedrock server is currently offline due to an unknown technical error and is actively being diagnosed alongside external Playit tunnel routing (`NetherNet` vs. `RakNet`).
+* **Objective:** Isolate the Minecraft Bedrock Dedicated Server (VM 104) onto its own Layer 2 bridge and Layer 3 subnet (`172.16.30.0/24`), completely separated from the primary LAN (`vmbr1`) and the Kali/Metasploitable lab segment (`vmbr2`), while avoiding inbound WAN port forwarding on OPNsense.
 * **Implementation Details:**
-  * **New bridge:** Created `vmbr3` in Proxmox as an internal-only Linux bridge (no physical port, no IP on the host). VM 104 is the only guest on it, and I'm keeping it that way, because two VMs on the same bridge talk to each other directly and never pass through the firewall rules.
-  * **OPNsense interface:** Added a fourth VirtIO NIC to OPNsense VM 103 on `vmbr3` (`vtnet3`), assigned it as `opt3` with the description `MinecraftBridge`, and gave it a static `172.16.30.1/24`. I picked that subnet so it would not overlap `192.168.1.0/24`, `192.168.2.0/24`, `192.168.8.0/24`, the NordVPN range, Tailscale's `100.64.0.0/10`, or the Docker ranges inside VM 104 (`172.17.0.0/16`, `172.18.0.0/16`). There is no DHCP on this interface.
-  * **VM 104 addressing:** Static 172.16.30.10/24 in Netplan, with 172.16.30.1 as both the gateway and the DNS server.
-  * **Firewall rules (MinecraftBridge, top to bottom):**
-    * **Rule 1 (Allow Gateway DNS):** `Pass` | TCP/UDP | Source: `MinecraftBridge net` | Destination: `MinecraftBridge address` | Port: `53 (DNS)`
-    * **Rule 2 (Block Private Ranges):** `Block` | Source: `MinecraftBridge net` | Destination: `PRIVATE_NETS` (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10`)
-    * **Rule 3 (Allow Outbound Internet):** `Pass` | Source: `MinecraftBridge net` | Destination: `*`
-  * **Outbound NAT:** OPNsense was already in Hybrid mode, and the automatic WAN rule included the new network, so no manual NAT rule was needed.
-  * **Player access:** A Playit tunnel agent on VM 104 makes an outbound connection, and a Cloudflare subdomain (`DNS-only CNAME`) points at the tunnel. The server's allow list is turned on.
-  * **Admin access:** Crafty Controller (web UI on `port 8443`) and SSH on VM 104 are reached through the OPNsense Tailscale subnet router. I added `172.16.30.0/24` to its advertised routes and approved it in the Tailscale admin console.
-  * **Server update and backups:** Updated the Bedrock server to 1.26.60 with Crafty's Update Center, confirmed the world folder still matched `level-name` in `server.properties`, set up a weekly scheduled backup in Crafty, and took Proxmox snapshots of VM 104 around the changes.
-  * **Verification:** From VM 104, DNS resolved through `172.16.30.1`, a ping to a public IP worked, and pings to the LAN (`192.168.1.1`) and OPT1 (`192.168.2.1`) gateways timed out (ICMP tests only so far). A Minecraft client on my PC joined using the public name.
+  * **Internal Bridge (`vmbr3`):** Created an internal-only Linux bridge in Proxmox with no physical NIC and no host IP, hosting only VM 104 so all inter-subnet traffic is forced through OPNsense.
+  * **OPNsense Interface (`vtnet3` / `MinecraftBridge`):** Assigned `opt3` with static gateway IP `172.16.30.1/24` (DHCP disabled) to avoid overlap with existing LAN, OPT1, VPN, Tailscale (`100.64.0.0/10`), and internal Docker bridge ranges.
+  * **VM 104 Static Addressing:** Configured `172.16.30.10/24` via Netplan using `172.16.30.1` as both default gateway and DNS resolver.
+  * **Stateful Firewall Rules (`MinecraftBridge`, top-to-bottom):**
+    1. **Pass:** `TCP/UDP` from `MinecraftBridge net` to `MinecraftBridge address` on port `53` (Unbound DNS).
+    2. **Block:** All traffic from `MinecraftBridge net` to `PRIVATE_NETS` alias (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10`).
+    3. **Pass:** All outbound traffic from `MinecraftBridge net` to `*` (WAN Internet).
+  * **Administrative & Player Access:** Admin access to Crafty Controller (`:8443`) and SSH runs over Tailscale subnet routing (`172.16.30.0/24`). External player access uses an outbound Playit tunnel agent paired with a Cloudflare DNS-only CNAME record (`<subdomain>.<domain>.com`) and an enforced server `allowlist`.
+* **Verification & Active Investigation:**
+  * Verified network isolation (`192.168.1.1` / `192.168.2.1` ICMP timeouts), DNS forwarding via Unbound DoT, `allowlist` entries, and Tailscale subnet routing.
+  * Currently investigating the active server outage, auditing the two Playit tunnel entries (`NetherNet` vs. `RakNet`), verifying active UDP listeners on `19132`, and testing public connectivity independently of DNS.
+---
 
+## Future Roadmap: $0-First AI Homelab Administrator (Planned)
+* **Status:** Architectural Design Phase (Not Yet Installed)
+* **Goal:** Build a context-aware, read-first AI infrastructure assistant capable of querying live system state, analyzing Proxmox/Docker/OPNsense logs, referencing repository documentation, and recommending evidence-based fixes.
+* **Planned Stack & Constraints:**
+  * **Budget & Providers:** $0-first model routing prioritizing free API tiers (Claude, ChatGPT, Gemini) and local diagnostic scripts before adding dedicated GPU hardware for local inference (`Ollama`).
+  * **Architecture:** `LibreChat` (UI) + `LiteLLM` (provider routing) + `MCP` (structured read-only diagnostic tools) + `RAG` knowledge base indexed against this repository's documentation and troubleshooting logs.
+  * **Security Guardrails:** Strict read-only telemetry at launch, zero unrestricted root access, and mandatory human-in-the-loop approval before executing state changes.
 
 ---
 
@@ -251,10 +259,8 @@ After a critical hardware modernization in June 2026 and an advanced network re-
 * **October 2026:** Crafty and SSH on VM 104 timed out from my PC even though the server was fine (`ss` showed Crafty listening on 8443 and `curl` from inside the VM got a response). A `tracert` showed my traffic leaving through my normal internet gateway instead of the Tailscale tunnel, because the subnet routes OPNsense advertised did not include `172.16.30.0/24`. I added it to the OPNsense Tailscale plugin's Advertised Routes and approved it in the admin console. Right after saving, OPNsense's Tailscale node logged out (`tailscale status` showed "Logged out"), which also cut off my route to the OPNsense web GUI, because OPNsense is the node that provides that route. I got back in through the Proxmox console for VM 103, logged the node back in (it re-registered as `opnsense-1`), and confirmed all three routes were approved. I also set up an SSH tunnel through VM 100 as a backup path to the OPNsense GUI. The Proxmox console, which has its own Tailscale address, is the fallback when OPNsense's Tailscale goes down.
 * **October 2026:** The Minecraft client showed "The host you are trying to join is using an older version" when I tried to join. That told me the whole path (DNS, tunnel, server) worked and the server software was just behind the game. I updated the Bedrock server to 1.26.60 through Crafty's Update Center, checked that the world folder still matched `level-name` in `server.properties`, ran a backup, and joined successfully.
 * **October 2026:** After updating OPNsense to 26.7.7 (which rebooted the firewall), joining the Minecraft server through its public name failed with "Multiplayer Connection Failed" (error detail `InitialConnection-13`), even though Crafty showed the server online and the client and server were on the same version. Joining the server's private address worked, which pointed at the tunnel instead of the server, and restarting the Playit agent (`sudo systemctl restart playit`) fixed it. The agent had kept running without recovering after the network dropped, so I now restart it after any OPNsense reboot and plan to add a monitor that checks the public address.
-
-
+* **November 2026 (Active Outage & Investigation):** The Minecraft Bedrock server is currently down due to an unknown technical error and is actively being worked on. Earlier diagnostic work showed that internal/Tailscale connections to `UDP 19132` worked while public connections via the custom CNAME did not, verified the server `allowlist` (two approved players with valid XUIDs), confirmed `cloudflared` was not installed/active on the checked host, and identified two Playit tunnel entries (`NetherNet` and `RakNet`). Diagnosis of the current outage, tunnel status/targets, UDP listener state, and public connectivity is ongoing.
 ---
-
 
 ## Network Topology and Signal/Data Flow
 
